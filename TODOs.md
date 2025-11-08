@@ -11,14 +11,14 @@
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 0.0 | Git 초기화 및 원격 저장소 연결 | ⏳ TODO | https://github.com/bluecalif/ideator-books.git |
-| 0.1 | 필수 패키지 추가 설치 | ⏳ TODO | fastapi, uvicorn, supabase, reportlab, httpx |
+| 0.0 | Git 초기화 및 원격 저장소 연결 | ✅ DONE | https://github.com/bluecalif/ideator-books.git |
+| 0.1 | 필수 패키지 추가 설치 | ✅ DONE | fastapi, uvicorn, supabase, reportlab, httpx |
 | 0.2 | Supabase 프로젝트 생성 및 연결 | ✅ DONE | URL: xsrbxmhrnamsyhldjuju.supabase.co |
 | 0.3 | OpenAI API 키 설정 | ✅ DONE | OPENAI_API_KEY 보유 |
-| 0.4 | .env 및 .env.example 파일 생성 | ⏳ TODO | 환경 변수 설정 |
-| 0.5 | 프로젝트 디렉토리 구조 생성 | ⏳ TODO | backend/, frontend/ |
+| 0.4 | .env 및 .env.example 파일 생성 | ✅ DONE | 환경 변수 설정 |
+| 0.5 | 프로젝트 디렉토리 구조 생성 | ✅ DONE | backend/ 완료, frontend/ 대기 |
 | 0.6 | KB 파일 분석 | ✅ DONE | 4개 도메인 MD (경제경영/과학기술/역사사회/인문자기계발) |
-| 0.7 | 🔄 Git Commit: "Phase 0 완료" | ⏳ TODO | 초기 환경 설정 |
+| 0.7 | 🔄 Git Commit: "Phase 0 완료" | ✅ DONE | commit f86876c, pushed to origin/master |
 
 ---
 
@@ -28,20 +28,20 @@
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 1.1.1 | FastAPI 초기화 (backend/main.py) | ⏳ TODO | 엔트리포인트 |
-| 1.1.2 | 디렉토리 구조 생성 | ⏳ TODO | core/, langgraph_pipeline/, services/, models/, api/ |
-| 1.1.3 | 환경 설정 (backend/core/config.py) | ⏳ TODO | Pydantic Settings |
-| 1.1.4 | Supabase 연결 (backend/core/database.py) | ⏳ TODO | 클라이언트 초기화 |
+| 1.1.1 | FastAPI 초기화 (backend/main.py) | ✅ DONE | Health check 엔드포인트 테스트 성공 |
+| 1.1.2 | 디렉토리 구조 생성 | ✅ DONE | core/, langgraph_pipeline/, services/, models/, api/ |
+| 1.1.3 | 환경 설정 (backend/core/config.py) | ✅ DONE | Pydantic Settings 적용 |
+| 1.1.4 | Supabase 연결 (backend/core/database.py) | ✅ DONE | get_supabase() dependency 구현 |
 
 ### 1.2 KB 처리 시스템
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 1.2.1 | KB 파서 구현 (backend/services/kb_service.py) | ⏳ TODO | MD → 구조화 데이터 |
-| 1.2.2 | KB 데이터 모델 (backend/models/schemas.py) | ⏳ TODO | KBItem, Anchor, Insight |
-| 1.2.3 | 4개 도메인 KB 파싱 및 검증 | ⏳ TODO | 인사이트 + 융합형 플래그 |
-| 1.2.4 | KB 검색 도구 (backend/tools/kb_search.py) | ⏳ TODO | LangChain Tool, 유사도 기반 |
-| 1.2.5 | ✅ 테스트: KB 파싱 실제 데이터 검증 | ⏳ TODO | 4개 도메인, 중복/누락 확인 |
+| 1.2.1 | KB 파서 구현 (backend/services/kb_service.py) | ✅ DONE | MD → 구조화 데이터, TF-IDF 검색 |
+| 1.2.2 | KB 데이터 모델 (backend/models/schemas.py) | ✅ DONE | KBItem, KBSearchResult, KBStats |
+| 1.2.3 | 4개 도메인 KB 파싱 및 검증 | ✅ DONE | 128개 인사이트 (융합형 48개, 37.5%) |
+| 1.2.4 | KB 검색 도구 (backend/tools/kb_search.py) | ✅ DONE | LangChain Tool 래퍼, 도메인별 검색 |
+| 1.2.5 | ✅ 테스트: KB 파싱 실제 데이터 검증 | ✅ DONE | 5/5 테스트 통과 (로딩/통계/고유성/융합형/검색) |
 | 1.2.6 | 🔄 Git Commit: "KB 처리 시스템 완료" | ⏳ TODO | 파서 + 검색 + 테스트 |
 
 ### 1.3 LangGraph State 및 그래프 정의
@@ -84,6 +84,7 @@
 | 1.5.2 | 샘플 2문장 생성 | ⏳ TODO | 각 모드별 미리보기 |
 | 1.5.3 | ✅ 테스트: Fusion Helper 실행 | ⏳ TODO | 3권 샘플로 추천 검증 |
 | 1.5.4 | 🔄 Git Commit: "Phase 1 완료" | ⏳ TODO | 백엔드 핵심 로직 |
+| 1.5.5 | 📋 Phase 1 후속 검토: KB 통합지식 파싱 추가 여부 | ⏳ TODO | LangGraph 완성 후 Integrator 노드에서 필요성 판단. 현재는 128개 개별 인사이트만 사용 |
 
 ---
 
