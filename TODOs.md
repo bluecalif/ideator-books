@@ -42,16 +42,18 @@
 | 1.2.3 | 4개 도메인 KB 파싱 및 검증 | ✅ DONE | 128개 인사이트 (융합형 48개, 37.5%) |
 | 1.2.4 | KB 검색 도구 (backend/tools/kb_search.py) | ✅ DONE | LangChain Tool 래퍼, 도메인별 검색 |
 | 1.2.5 | ✅ 테스트: KB 파싱 실제 데이터 검증 | ✅ DONE | 5/5 테스트 통과 (로딩/통계/고유성/융합형/검색) |
-| 1.2.6 | 🔄 Git Commit: "KB 처리 시스템 완료" | ⏳ TODO | 파서 + 검색 + 테스트 |
+| 1.2.6 | 🔄 Git Commit: "KB 처리 시스템 완료" | ✅ DONE | 파서 + 검색 + 테스트 |
 
 ### 1.3 LangGraph State 및 그래프 정의
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 1.3.1 | OnePagerState 정의 (state.py) | ⏳ TODO | TypedDict, Annotated, operator.add |
-| 1.3.2 | LangGraph 구조 정의 (graph.py) | ⏳ TODO | StateGraph, 노드 연결, Send() API |
-| 1.3.3 | 체크포인트 저장 (MemorySaver) | ⏳ TODO | 실패 시 재시도 |
-| 1.3.4 | 🔄 Git Commit: "LangGraph State 정의" | ⏳ TODO | State + 그래프 골격 |
+| 1.3.1 | OnePagerState 정의 (state.py) | ✅ DONE | TypedDict, Annotated, operator.add, 20+ 필드 |
+| 1.3.2 | LangGraph 구조 정의 (graph.py) | ✅ DONE | StateGraph 골격, Send() API 준비 |
+| 1.3.3 | 체크포인트 저장 (MemorySaver) | ✅ DONE | compile_graph with checkpointer |
+| 1.3.4 | 노드 유틸리티 함수 (utils.py) | ✅ DONE | agent_node, 검증, 로깅 헬퍼 |
+| 1.3.5 | ✅ (테스트 생략) Phase 1.4에서 통합 테스트 | N/A | 노드 미구현으로 단독 실행 불가 |
+| 1.3.6 | 🔄 Git Commit: "LangGraph State 정의" | ⏳ TODO | State + 그래프 골격 + 유틸리티 |
 
 ### 1.4 LangGraph 노드 구현
 
