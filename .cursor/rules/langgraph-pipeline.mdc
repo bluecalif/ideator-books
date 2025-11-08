@@ -1,0 +1,224 @@
+---
+alwaysApply: true
+description: LangGraph pipeline implementation standards for 1p generation workflow
+---
+
+# LangGraph Pipeline Implementation
+
+## Overview
+Guidelines for implementing the multi-agent LangGraph pipeline that generates 1-page outputs from knowledge base and book summaries. The pipeline consists of 5 sequential nodes with 4 parallel reviewers.
+
+## Domain Knowledge
+
+### Pipeline Architecture
+- **AnchorMapper**: Maps book summaries to domain-specific anchors (4 domains)
+- **Reviewers (4)**: Parallel agents analyzing advantages, problems, and conditions per domain
+  - 경제경영 (Economics/Business)
+  - 과학기술 (Science/Technology)
+  - 역사사회 (History/Society)
+  - 인문자기계발 (Humanities/Self-development)
+- **Integrator**: Combines reviews into tension axes (Reduce mode) or simple merge
+- **Producer**: Generates 1p output in MD/PDF format
+- **Validator**: Ensures anchored_by=100%, unique_sentences≥3, external_frames=0
+
+### State Management
+- Use `TypedDict` with `Annotated[list, operator.add]` for accumulating fields
+- Core state fields: `messages`, `reviews`, `tension_axes`, `unique_sentences`, `validation_passed`
+
+## Standards & Conventions
+
+### File Structure
+```
+backend/langgraph_pipeline/
+├── graph.py           # Main graph definition and compilation
+├── state.py           # OnePagerState TypedDict
+├── nodes/
+│   ├── anchor_mapper.py
+│   ├── reviewers.py   # All 4 domain reviewers
+│   ├── integrator.py
+│   ├── producer.py
+│   └── validator.py
+└── utils.py           # agent_node helper function
+```
+
+### Naming Conventions
+- State class: `OnePagerState`
+- Node functions: `{action}_{entity}` (e.g., `map_anchors`, `review_domain`)
+- Graph variable: `workflow` or `graph`
+- Checkpointer: `memory` (MemorySaver instance)
+
+## Implementation Patterns
+
+### State Definition
+```python
+from typing import Sequence, Annotated
+from typing_extensions import TypedDict
+from langchain_core.messages import BaseMessage
+import operator
+
+class OnePagerState(TypedDict):
+    # Accumulating fields
+    messages: Annotated[Sequence[BaseMessage], operator.add]
+    reviews: Annotated[list, operator.add]
+    
+    # Single-value fields
+    book_ids: list[str]
+    mode: str  # "reduce" or "simple_merge"
+    anchors: dict  # {domain: anchor_id}
+    tension_axes: list[str]
+    unique_sentences: list[str]
+    
+    # Validation
+    anchored_by_percent: float
+    validation_passed: bool
+```
+
+### Node Implementation Pattern
+```python
+from langchain_core.messages import HumanMessage
+
+def node_function(state: OnePagerState) -> dict:
+    """Each node returns partial state update"""
+    # Process state
+    result = do_work(state)
+    
+    # Return only updated fields
+    return {
+        "field_name": result,
+        "messages": [HumanMessage(content=result, name="NodeName")]
+    }
+```
+
+### Parallel Reviewers with Send()
+```python
+from langgraph.constants import Send
+
+def initiate_reviews(state: OnePagerState):
+    """Fan-out to 4 domain reviewers in parallel"""
+    domains = ["경제경영", "과학기술", "역사사회", "인문자기계발"]
+    
+    return [
+        Send(
+            "review_domain",
+            {
+                "domain": domain,
+                "anchor": state["anchors"][domain],
+                "messages": state["messages"]
+            }
+        )
+        for domain in domains
+    ]
+```
+
+### Agent Node with functools.partial
+```python
+import functools
+from langgraph.prebuilt import create_react_agent
+from langchain_openai import ChatOpenAI
+
+def agent_node(state, agent, name):
+    """Wrapper for react agents"""
+    response = agent.invoke(state)
+    return {
+        "messages": [
+            HumanMessage(
+                content=response["messages"][-1].content,
+                name=name
+            )
+        ]
+    }
+
+# Create reviewer agents
+llm = ChatOpenAI(model="gpt-4o")
+reviewer_agent = create_react_agent(llm, tools=[kb_search_tool])
+reviewer_node = functools.partial(
+    agent_node, 
+    agent=reviewer_agent, 
+    name="Reviewer_경제경영"
+)
+```
+
+### Graph Construction
+```python
+from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
+
+# Create graph
+workflow = StateGraph(OnePagerState)
+
+# Add nodes
+workflow.add_node("anchor_mapper", anchor_mapper_node)
+workflow.add_node("review_domain", review_domain_node)
+workflow.add_node("integrator", integrator_node)
+workflow.add_node("producer", producer_node)
+workflow.add_node("validator", validator_node)
+
+# Connect nodes
+workflow.add_edge(START, "anchor_mapper")
+workflow.add_conditional_edges(
+    "anchor_mapper",
+    initiate_reviews,
+    ["review_domain"]
+)
+workflow.add_edge("review_domain", "integrator")
+workflow.add_edge("integrator", "producer")
+workflow.add_edge("producer", "validator")
+
+# Conditional end (retry on validation failure)
+def should_retry(state):
+    return END if state["validation_passed"] else "anchor_mapper"
+
+workflow.add_conditional_edges("validator", should_retry)
+
+# Compile with checkpointer
+memory = MemorySaver()
+graph = workflow.compile(checkpointer=memory)
+```
+
+### Execution with Progress Tracking
+```python
+from langchain_core.runnables import RunnableConfig
+
+config = RunnableConfig(
+    recursion_limit=50,
+    configurable={"thread_id": run_id}
+)
+
+# Stream for progress tracking
+for event in graph.stream(inputs, config):
+    node_name = list(event.keys())[0]
+    # Update progress in database
+    update_run_progress(run_id, node_name, "completed")
+```
+
+## Checklist
+
+### Before Implementing a Node
+- [ ] Define clear input/output state fields
+- [ ] Identify required tools (KB search, LLM, etc.)
+- [ ] Plan error handling strategy
+- [ ] Consider timeout and retry logic
+
+### Node Implementation
+- [ ] Returns only updated state fields (partial update)
+- [ ] Includes message with node name for tracing
+- [ ] Handles errors gracefully (try-except)
+- [ ] Validates inputs before processing
+
+### Graph Integration
+- [ ] Node is added to workflow
+- [ ] Edges are correctly connected
+- [ ] Conditional edges have proper routing logic
+- [ ] Checkpointer is configured for retry
+
+### Testing
+- [ ] Unit test for node logic
+- [ ] Integration test with mock state
+- [ ] End-to-end test with real KB data
+- [ ] Progress tracking verified
+
+## References
+- LangGraph patterns: `docs/07-LangGraph-Multi-Agent-Supervisor.ipynb`
+- Parallel execution: `docs/10-LangGraph-Research-Assistant.ipynb`
+- State management: `backend/langgraph_pipeline/state.py`
+- Project PRD: `docs/PRD_ideator-books.md` (Section 6)

@@ -1,0 +1,396 @@
+---
+alwaysApply: true
+description: Next.js frontend page and component implementation standards
+---
+
+# Frontend Pages Standards
+
+## Overview
+Guidelines for implementing Next.js 14+ App Router pages and components for the 6 main screens. Uses TailwindCSS + shadcn/ui for styling, React Query for data fetching, and Zustand for client state.
+
+## Domain Knowledge
+
+### 6 Main Pages
+1. **/library** - CSV upload and recent results
+2. **/books/select** - Book selection with filters
+3. **/fusion** - Fusion mode selection (Reduce vs Simple Merge)
+4. **/runs/[id]** - Generation progress tracking
+5. **/preview/[id]** - 1p preview and approval
+6. **/history** - User's generation history
+
+### User Flow
+Library → Books Selection → Fusion Helper → Progress → Preview → History
+
+## Standards & Conventions
+
+### File Structure
+```
+frontend/
+├── app/
+│   ├── layout.tsx              # Root layout with auth
+│   ├── library/
+│   │   └── page.tsx            # CSV upload
+│   ├── books/
+│   │   └── select/
+│   │       └── page.tsx        # Book selection
+│   ├── fusion/
+│   │   └── page.tsx            # Fusion mode
+│   ├── runs/
+│   │   └── [id]/
+│   │       └── page.tsx        # Progress tracking
+│   ├── preview/
+│   │   └── [id]/
+│   │       └── page.tsx        # 1p preview
+│   └── history/
+│       └── page.tsx            # History list
+├── components/
+│   ├── ui/                     # shadcn/ui components
+│   ├── book-filter.tsx         # Book filters
+│   ├── fusion-card.tsx         # Fusion mode card
+│   ├── progress-bar.tsx        # Progress visualization
+│   └── history-card.tsx        # History item card
+├── lib/
+│   ├── api.ts                  # API client functions
+│   └── supabase.ts             # Supabase client
+└── hooks/
+    └── useRunProgress.ts       # Progress polling hook
+```
+
+### Naming Conventions
+- Page components: `export default function PageName()`
+- Client components: `'use client'` at top
+- Server components: default (no directive)
+- Component files: kebab-case (e.g., `book-filter.tsx`)
+- Hook files: camelCase starting with `use` (e.g., `useBooks.ts`)
+
+## Implementation Patterns
+
+### Page Component Structure
+```typescript
+// app/library/page.tsx
+'use client'
+
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Upload } from 'lucide-react'
+
+export default function LibraryPage() {
+  // State
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  
+  // Data fetching
+  const { data: libraries, isLoading } = useQuery({
+    queryKey: ['libraries'],
+    queryFn: () => api.getLibraries()
+  })
+  
+  const { data: recentResults } = useQuery({
+    queryKey: ['history', { limit: 6 }],
+    queryFn: () => api.getHistory({ limit: 6 })
+  })
+  
+  // Handlers
+  const handleUpload = async () => {
+    if (!selectedFile) return
+    await api.uploadCSV(selectedFile)
+  }
+  
+  return (
+    <div className="container mx-auto p-6">
+      {/* Upload section */}
+      <section className="mb-8">
+        <h2 className="text-2xl font-bold mb-4">CSV Upload</h2>
+        {/* Upload UI */}
+      </section>
+      
+      {/* Recent results */}
+      <section>
+        <h2 className="text-2xl font-bold mb-4">Recent Results</h2>
+        <div className="grid grid-cols-3 gap-4">
+          {recentResults?.map(result => (
+            <HistoryCard key={result.id} data={result} />
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+```
+
+### API Client
+```typescript
+// lib/api.ts
+import axios from 'axios'
+
+const apiClient = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+// Add auth token interceptor
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('supabase.auth.token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+export const api = {
+  // Books
+  getBooks: async (filters?: {
+    domain?: string
+    yearRange?: [number, number]
+  }) => {
+    const { data } = await apiClient.get('/api/books', {
+      params: { filters: JSON.stringify(filters) }
+    })
+    return data
+  },
+  
+  // Fusion preview
+  getFusionPreview: async (bookIds: string[]) => {
+    const { data } = await apiClient.post('/api/fusion/preview', {
+      book_ids: bookIds
+    })
+    return data
+  },
+  
+  // Runs
+  createRun: async (params: {
+    book_ids: string[]
+    mode: 'reduce' | 'simple_merge'
+    format: 'content' | 'service'
+    remind_enabled: boolean
+  }) => {
+    const { data } = await apiClient.post('/api/runs', params)
+    return data
+  },
+  
+  getRunStatus: async (runId: string) => {
+    const { data } = await apiClient.get(`/api/runs/${runId}`)
+    return data
+  },
+  
+  // History
+  getHistory: async (params?: { limit?: number; offset?: number }) => {
+    const { data } = await apiClient.get('/api/history', { params })
+    return data
+  }
+}
+```
+
+### Progress Polling Hook
+```typescript
+// hooks/useRunProgress.ts
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api'
+
+export function useRunProgress(runId: string) {
+  return useQuery({
+    queryKey: ['run', runId],
+    queryFn: () => api.getRunStatus(runId),
+    refetchInterval: (data) => {
+      // Stop polling when completed or failed
+      if (data?.status === 'completed' || data?.status === 'failed') {
+        return false
+      }
+      return 2000 // Poll every 2 seconds
+    },
+    enabled: !!runId
+  })
+}
+```
+
+### Client State (Zustand)
+```typescript
+// lib/store.ts
+import { create } from 'zustand'
+
+interface BookSelectionState {
+  selectedBooks: string[]
+  format: 'content' | 'service'
+  remindEnabled: boolean
+  
+  toggleBook: (bookId: string) => void
+  setFormat: (format: 'content' | 'service') => void
+  setRemindEnabled: (enabled: boolean) => void
+  reset: () => void
+}
+
+export const useBookSelection = create<BookSelectionState>((set) => ({
+  selectedBooks: [],
+  format: 'content',
+  remindEnabled: false,
+  
+  toggleBook: (bookId) => set((state) => ({
+    selectedBooks: state.selectedBooks.includes(bookId)
+      ? state.selectedBooks.filter(id => id !== bookId)
+      : [...state.selectedBooks, bookId]
+  })),
+  
+  setFormat: (format) => set({ format }),
+  setRemindEnabled: (enabled) => set({ remindEnabled: enabled }),
+  reset: () => set({ 
+    selectedBooks: [], 
+    format: 'content', 
+    remindEnabled: false 
+  })
+}))
+```
+
+### Component Pattern (shadcn/ui)
+```typescript
+// components/fusion-card.tsx
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+
+interface FusionCardProps {
+  mode: 'reduce' | 'simple_merge'
+  title: string
+  description: string
+  samples: string[]
+  isRecommended?: boolean
+  onSelect: () => void
+}
+
+export function FusionCard({ 
+  mode, 
+  title, 
+  description, 
+  samples, 
+  isRecommended,
+  onSelect 
+}: FusionCardProps) {
+  return (
+    <Card className={isRecommended ? 'border-primary' : ''}>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>{title}</CardTitle>
+          {isRecommended && (
+            <Badge variant="default">Recommended</Badge>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </CardHeader>
+      
+      <CardContent>
+        <div className="space-y-2 mb-4">
+          <p className="text-sm font-medium">Sample Output:</p>
+          {samples.map((sample, i) => (
+            <p key={i} className="text-sm text-muted-foreground">
+              {i + 1}. {sample}
+            </p>
+          ))}
+        </div>
+        
+        <Button 
+          onClick={onSelect} 
+          className="w-full"
+          variant={isRecommended ? 'default' : 'outline'}
+        >
+          Select {mode === 'reduce' ? 'Reduce' : 'Simple Merge'} Mode
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+### Progress Visualization
+```typescript
+// components/progress-bar.tsx
+'use client'
+
+import { cn } from '@/lib/utils'
+
+interface ProgressBarProps {
+  nodes: Array<{
+    name: string
+    status: 'pending' | 'running' | 'completed' | 'failed'
+  }>
+  currentNode?: string
+}
+
+export function ProgressBar({ nodes, currentNode }: ProgressBarProps) {
+  return (
+    <div className="flex items-center justify-between w-full">
+      {nodes.map((node, index) => (
+        <div key={node.name} className="flex items-center">
+          {/* Node indicator */}
+          <div className="flex flex-col items-center">
+            <div 
+              className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center",
+                node.status === 'completed' && "bg-green-500",
+                node.status === 'running' && "bg-blue-500 animate-pulse",
+                node.status === 'failed' && "bg-red-500",
+                node.status === 'pending' && "bg-gray-300"
+              )}
+            >
+              {node.status === 'completed' && '✓'}
+              {node.status === 'running' && '⋯'}
+              {node.status === 'failed' && '✗'}
+            </div>
+            <span className="text-xs mt-2">{node.name}</span>
+          </div>
+          
+          {/* Connector line */}
+          {index < nodes.length - 1 && (
+            <div className="w-24 h-1 bg-gray-300 mx-2" />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+## Checklist
+
+### New Page Implementation
+- [ ] Page component uses App Router (`app/` directory)
+- [ ] Client components have `'use client'` directive
+- [ ] Data fetching uses React Query
+- [ ] Client state uses Zustand if shared across components
+- [ ] Loading and error states are handled
+- [ ] Responsive design with Tailwind breakpoints
+
+### API Integration
+- [ ] API functions are in `lib/api.ts`
+- [ ] Auth token is attached to requests
+- [ ] Error responses are handled
+- [ ] TypeScript types are defined for responses
+- [ ] Query keys are consistent and documented
+
+### Component Design
+- [ ] Uses shadcn/ui components where applicable
+- [ ] Props are typed with TypeScript interfaces
+- [ ] Accessible (ARIA labels, keyboard navigation)
+- [ ] Responsive (mobile, tablet, desktop)
+- [ ] Consistent spacing with Tailwind utilities
+
+### Performance
+- [ ] Images use Next.js `<Image>` component
+- [ ] Heavy computations are memoized
+- [ ] Lists use `key` prop correctly
+- [ ] Polling intervals are reasonable (2-5s)
+- [ ] Infinite scroll uses `useInfiniteQuery`
+
+### UX
+- [ ] Loading spinners for async operations
+- [ ] Toast notifications for success/error
+- [ ] Confirmation dialogs for destructive actions
+- [ ] Form validation with error messages
+- [ ] Disabled states for buttons during submission
+
+## References
+- Next.js App Router: https://nextjs.org/docs/app
+- React Query: https://tanstack.com/query/latest
+- Zustand: https://zustand-demo.pmnd.rs/
+- shadcn/ui: https://ui.shadcn.com/
+- Page specs: `TODOs.md` (Phase 3.2)
+- Project PRD: `docs/PRD_ideator-books.md` (Section 4)

@@ -1,0 +1,246 @@
+---
+alwaysApply: true
+description: Knowledge Base processing and search standards for 4-domain expert insights
+---
+
+# Knowledge Base Processing
+
+## Overview
+Guidelines for parsing, storing, and searching expert knowledge base from 4 domain markdown files. Each domain contains insights, fusion insights, and anchor points for generating evidence-based 1p outputs.
+
+## Domain Knowledge
+
+### KB Structure (4 Domains)
+- **경제경영** (Economics/Business): `docs/지식베이스생성_경제경영_구글스튜디오.md`
+- **과학기술** (Science/Technology): `docs/지식베이스생성_과학기술_구글스튜디오.md`
+- **역사사회** (History/Society): `docs/지식베이스생성_역사사회_구글스튜디오.md`
+- **인문자기계발** (Humanities/Self-development): `docs/지식베이스생성_인문자기계발_구글스튜디오.md`
+
+### KB Content Format
+Each domain MD file contains:
+- **소분류 (Subcategories)**: Tables with insights and reference books
+- **핵심 인사이트 (Key Insights)**: Expert knowledge statements
+- **융합형 인사이트 (Fusion Insights)**: Marked with **(융합형)** prefix
+- **참고 도서 (Reference Books)**: Source attribution
+
+### KB Item Schema
+```python
+class KBItem(BaseModel):
+    kb_id: str              # Unique identifier
+    domain: str             # One of 4 domains
+    type: str               # Subcategory (소분류)
+    anchor_id: str          # Unique anchor for referencing
+    content: str            # Insight text
+    is_fusion: bool         # True if marked as (융합형)
+    reference_books: list[str]  # Source books
+```
+
+## Standards & Conventions
+
+### File Structure
+```
+backend/
+├── services/
+│   └── kb_service.py      # KB parsing and search
+├── models/
+│   └── schemas.py         # KBItem, Anchor models
+└── tools/
+    └── kb_search.py       # LangChain Tool for KB search
+```
+
+### Naming Conventions
+- Service class: `KBService`
+- Search function: `search_kb(query: str, domain: str) -> list[KBItem]`
+- Parser function: `parse_domain_kb(file_path: str) -> list[KBItem]`
+- Anchor format: `{domain}_{type}_{index}` (e.g., `경제경영_경제예측_001`)
+
+## Implementation Patterns
+
+### KB Parser
+```python
+import re
+from pathlib import Path
+
+class KBService:
+    def __init__(self, kb_dir: str = "docs"):
+        self.kb_dir = Path(kb_dir)
+        self.kb_items = {}  # {domain: [KBItem]}
+        self._load_all_domains()
+    
+    def _load_all_domains(self):
+        """Load all 4 domain KB files"""
+        domains = ["경제경영", "과학기술", "역사사회", "인문자기계발"]
+        for domain in domains:
+            file_path = self.kb_dir / f"지식베이스생성_{domain}_구글스튜디오.md"
+            self.kb_items[domain] = self._parse_domain_kb(file_path, domain)
+    
+    def _parse_domain_kb(self, file_path: Path, domain: str) -> list[KBItem]:
+        """Parse single domain KB file"""
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        items = []
+        # Parse tables with format: | 핵심 인사이트 | 참고 도서 |
+        # Extract insights and check for (융합형) marker
+        # Generate anchor_ids
+        
+        return items
+```
+
+### KB Search Tool (LangChain)
+```python
+from langchain.tools import Tool
+from typing import Optional
+
+def create_kb_search_tool(kb_service: KBService) -> Tool:
+    """Create LangChain Tool for KB search"""
+    
+    def search_kb(query: str, domain: Optional[str] = None) -> str:
+        """
+        Search KB for relevant insights
+        
+        Args:
+            query: Search query (book summary or concept)
+            domain: Optional domain filter
+        
+        Returns:
+            Formatted string of relevant KB items
+        """
+        results = kb_service.search(query, domain)
+        
+        # Format results
+        formatted = []
+        for item in results:
+            fusion_mark = "[FUSION]" if item.is_fusion else ""
+            formatted.append(
+                f"{fusion_mark} [{item.anchor_id}] {item.content}\n"
+                f"Source: {', '.join(item.reference_books)}"
+            )
+        
+        return "\n\n".join(formatted)
+    
+    return Tool(
+        name="kb_search",
+        description="Search knowledge base for expert insights by query and domain",
+        func=search_kb
+    )
+```
+
+### Similarity Search
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+class KBService:
+    def search(
+        self, 
+        query: str, 
+        domain: Optional[str] = None,
+        top_k: int = 5
+    ) -> list[KBItem]:
+        """
+        Search KB items by semantic similarity
+        
+        Args:
+            query: Search text
+            domain: Optional domain filter
+            top_k: Number of results to return
+        """
+        # Filter by domain if specified
+        candidates = []
+        if domain:
+            candidates = self.kb_items.get(domain, [])
+        else:
+            for items in self.kb_items.values():
+                candidates.extend(items)
+        
+        if not candidates:
+            return []
+        
+        # TF-IDF similarity
+        corpus = [item.content for item in candidates]
+        vectorizer = TfidfVectorizer()
+        tfidf_matrix = vectorizer.fit_transform(corpus + [query])
+        
+        # Calculate similarity
+        query_vector = tfidf_matrix[-1]
+        similarities = cosine_similarity(query_vector, tfidf_matrix[:-1])[0]
+        
+        # Get top-k results
+        top_indices = np.argsort(similarities)[-top_k:][::-1]
+        results = [candidates[i] for i in top_indices]
+        
+        return results
+```
+
+### Anchor Validation
+```python
+def validate_anchored_by(text: str, kb_items: list[KBItem]) -> dict:
+    """
+    Validate that all sentences in text are anchored to KB
+    
+    Returns:
+        {
+            "anchored_by_percent": float,
+            "unanchored_sentences": list[str],
+            "anchor_references": dict[str, list[str]]
+        }
+    """
+    # Split text into sentences
+    sentences = split_sentences(text)
+    
+    # Check each sentence for [anchor_id] tag
+    anchored_count = 0
+    unanchored = []
+    references = {}
+    
+    for sentence in sentences:
+        anchor_match = re.search(r'\[([^\]]+)\]', sentence)
+        if anchor_match:
+            anchor_id = anchor_match.group(1)
+            anchored_count += 1
+            references[sentence] = [anchor_id]
+        else:
+            unanchored.append(sentence)
+    
+    return {
+        "anchored_by_percent": (anchored_count / len(sentences)) * 100,
+        "unanchored_sentences": unanchored,
+        "anchor_references": references
+    }
+```
+
+## Checklist
+
+### KB File Parsing
+- [ ] All 4 domain files are loaded
+- [ ] Tables are correctly parsed (핵심 인사이트 | 참고 도서)
+- [ ] Fusion insights are flagged (check for **(융합형)** marker)
+- [ ] Anchor IDs are unique across all domains
+- [ ] Reference books are extracted and stored
+
+### KB Search Implementation
+- [ ] Search works with Korean text
+- [ ] Domain filtering is optional
+- [ ] Results are ranked by relevance
+- [ ] Fusion insights are prioritized when applicable
+- [ ] Search returns formatted strings with anchor_id
+
+### Integration with LangGraph
+- [ ] KB search tool is created and passed to agents
+- [ ] Agents can call KB search with domain context
+- [ ] Search results include anchor_id for referencing
+- [ ] Anchor validation is performed in Validator node
+
+### Data Quality
+- [ ] No duplicate anchor_ids
+- [ ] All insights have at least one reference book
+- [ ] Fusion insights are properly marked
+- [ ] Subcategories (소분류) are correctly extracted
+
+## References
+- KB files: `docs/지식베이스생성_*.md` (4 domains)
+- Data model: `backend/models/schemas.py`
+- Search tool: `backend/tools/kb_search.py`
+- Project PRD: `docs/PRD_ideator-books.md` (Section 7)

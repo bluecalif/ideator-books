@@ -1,0 +1,313 @@
+---
+alwaysApply: true
+description: Supabase PostgreSQL database schema and query patterns
+---
+
+# Database Schema Standards
+
+## Overview
+Guidelines for Supabase PostgreSQL database schema design, migrations, and query patterns. The schema supports user authentication, book libraries, KB storage, run tracking, and artifact management.
+
+## Domain Knowledge
+
+### Core Tables (7 + Auth)
+1. **users** - User profiles (extends Supabase Auth)
+2. **libraries** - Uploaded CSV collections
+3. **books** - Individual books from libraries
+4. **kb_items** - Knowledge base items (4 domains)
+5. **runs** - 1p generation jobs
+6. **artifacts** - Generated 1p files (MD/PDF)
+7. **reminders** - Reminder queue for review
+8. **audits** - Validation audit logs
+
+### Relationships
+- users 1:N libraries
+- libraries 1:N books
+- users 1:N runs
+- runs 1:N artifacts
+- users 1:N reminders → artifacts
+- runs 1:N audits
+
+## Standards & Conventions
+
+### Naming Conventions
+- Tables: plural, snake_case (e.g., `book_libraries`, `kb_items`)
+- Columns: snake_case (e.g., `user_id`, `created_at`)
+- Primary keys: `id` (UUID)
+- Foreign keys: `{table_singular}_id` (e.g., `user_id`, `library_id`)
+- Timestamps: `created_at`, `updated_at`
+- JSON columns: `{name}_json` (e.g., `params_json`, `meta_json`)
+
+### Data Types
+- IDs: `uuid` (default: `gen_random_uuid()`)
+- Timestamps: `timestamptz` (default: `now()`)
+- Text: `text` (unlimited) or `varchar(n)` (limited)
+- JSON: `jsonb` (indexed, queryable)
+- Boolean: `boolean` (default: `false`)
+- Enums: Create custom types for fixed sets
+
+## Implementation Patterns
+
+### Schema Definition (SQL)
+```sql
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Users table (extends Supabase Auth)
+CREATE TABLE users (
+    id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email text NOT NULL UNIQUE,
+    name text,
+    created_at timestamptz DEFAULT now()
+);
+
+-- Libraries table
+CREATE TABLE libraries (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name text NOT NULL,
+    uploaded_at timestamptz DEFAULT now(),
+    
+    CONSTRAINT unique_user_library UNIQUE (user_id, name)
+);
+
+-- Books table
+CREATE TABLE books (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    library_id uuid NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
+    meta_json jsonb NOT NULL,
+    -- meta_json structure: {title, author, year, domain, topic, summary}
+    created_at timestamptz DEFAULT now()
+);
+
+-- KB Items table
+CREATE TABLE kb_items (
+    kb_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    domain text NOT NULL CHECK (domain IN ('경제경영', '과학기술', '역사사회', '인문자기계발')),
+    type text NOT NULL,  -- 소분류
+    anchor_id text NOT NULL UNIQUE,
+    content text NOT NULL,
+    is_fusion boolean DEFAULT false,
+    reference_books text[],
+    
+    created_at timestamptz DEFAULT now()
+);
+
+-- Runs table
+CREATE TABLE runs (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    params_json jsonb NOT NULL,
+    -- params_json: {book_ids, mode, format, remind_enabled}
+    status text NOT NULL DEFAULT 'pending' 
+        CHECK (status IN ('pending', 'running', 'completed', 'failed')),
+    progress_json jsonb DEFAULT '{}',
+    error_message text,
+    created_at timestamptz DEFAULT now(),
+    completed_at timestamptz
+);
+
+-- Artifacts table
+CREATE TABLE artifacts (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id uuid NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    kind text NOT NULL DEFAULT 'onepager' CHECK (kind IN ('onepager')),
+    format text NOT NULL CHECK (format IN ('md', 'pdf')),
+    url text NOT NULL,  -- S3 or Supabase storage URL
+    metadata_json jsonb DEFAULT '{}',
+    created_at timestamptz DEFAULT now()
+);
+
+-- Reminders table
+CREATE TABLE reminders (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    artifact_id uuid NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,
+    schedule timestamptz,
+    active boolean DEFAULT true,
+    created_at timestamptz DEFAULT now(),
+    
+    CONSTRAINT unique_user_artifact_reminder UNIQUE (user_id, artifact_id)
+);
+
+-- Audits table
+CREATE TABLE audits (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id uuid NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    anchored_by_ok boolean NOT NULL,
+    unique3_ok boolean NOT NULL,
+    external0_ok boolean NOT NULL,
+    details_json jsonb,
+    created_at timestamptz DEFAULT now()
+);
+```
+
+### Indexes
+```sql
+-- Performance indexes
+CREATE INDEX idx_libraries_user ON libraries(user_id);
+CREATE INDEX idx_books_library ON books(library_id);
+CREATE INDEX idx_books_meta_domain ON books USING gin(meta_json);
+CREATE INDEX idx_kb_items_domain ON kb_items(domain);
+CREATE INDEX idx_kb_items_anchor ON kb_items(anchor_id);
+CREATE INDEX idx_runs_user ON runs(user_id);
+CREATE INDEX idx_runs_status ON runs(status);
+CREATE INDEX idx_artifacts_run ON artifacts(run_id);
+CREATE INDEX idx_reminders_user_active ON reminders(user_id, active);
+CREATE INDEX idx_audits_run ON audits(run_id);
+```
+
+### Row Level Security (RLS)
+```sql
+-- Enable RLS on all tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE libraries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE books ENABLE ROW LEVEL SECURITY;
+ALTER TABLE runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE artifacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
+
+-- KB items are public (read-only)
+ALTER TABLE kb_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "KB items are viewable by everyone" 
+    ON kb_items FOR SELECT USING (true);
+
+-- Users can only access their own data
+CREATE POLICY "Users can view own libraries" 
+    ON libraries FOR SELECT 
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own libraries" 
+    ON libraries FOR INSERT 
+    WITH CHECK (auth.uid() = user_id);
+
+-- Similar policies for other tables
+```
+
+### Query Patterns (Python + Supabase)
+```python
+from supabase import Client
+
+# Get books with filters
+def get_books_filtered(
+    supabase: Client,
+    user_id: str,
+    domain: str = None,
+    year_range: tuple = None
+) -> list:
+    """Query books with optional filters"""
+    query = supabase.table("books") \
+        .select("*, libraries!inner(user_id)") \
+        .eq("libraries.user_id", user_id)
+    
+    if domain:
+        query = query.filter("meta_json->>domain", "eq", domain)
+    
+    if year_range:
+        query = query \
+            .filter("meta_json->>year", "gte", year_range[0]) \
+            .filter("meta_json->>year", "lte", year_range[1])
+    
+    return query.execute().data
+
+# Create run with transaction
+def create_run_with_artifact(
+    supabase: Client,
+    user_id: str,
+    params: dict
+) -> tuple[str, str]:
+    """Create run and placeholder artifact atomically"""
+    
+    # Insert run
+    run = supabase.table("runs").insert({
+        "user_id": user_id,
+        "params_json": params,
+        "status": "pending"
+    }).execute()
+    
+    run_id = run.data[0]["id"]
+    
+    # Insert artifact placeholder
+    artifact = supabase.table("artifacts").insert({
+        "run_id": run_id,
+        "kind": "onepager",
+        "format": params["format"],
+        "url": ""  # Will be updated later
+    }).execute()
+    
+    return run_id, artifact.data[0]["id"]
+
+# Update run progress
+def update_run_progress(
+    supabase: Client,
+    run_id: str,
+    node_name: str,
+    status: str = "running"
+):
+    """Update run progress during pipeline execution"""
+    supabase.table("runs").update({
+        "status": status,
+        "progress_json": {
+            "current_node": node_name,
+            "timestamp": "now()"
+        }
+    }).eq("id", run_id).execute()
+
+# Get history with pagination
+def get_user_history(
+    supabase: Client,
+    user_id: str,
+    limit: int = 20,
+    offset: int = 0
+) -> list:
+    """Get user's generation history"""
+    return supabase.table("runs") \
+        .select("*, artifacts(*)") \
+        .eq("user_id", user_id) \
+        .eq("status", "completed") \
+        .order("created_at", desc=True) \
+        .range(offset, offset + limit - 1) \
+        .execute() \
+        .data
+```
+
+## Checklist
+
+### Schema Design
+- [ ] All tables have `id` as UUID primary key
+- [ ] Foreign keys use ON DELETE CASCADE or SET NULL appropriately
+- [ ] Timestamps use `timestamptz` with default `now()`
+- [ ] JSON columns use `jsonb` for indexing
+- [ ] Enums use CHECK constraints or custom types
+
+### Indexes
+- [ ] Foreign keys are indexed
+- [ ] Frequently filtered columns are indexed
+- [ ] JSONB columns use GIN indexes if queried
+- [ ] Composite indexes for multi-column filters
+
+### Row Level Security
+- [ ] RLS is enabled on all user data tables
+- [ ] Policies check `auth.uid() = user_id`
+- [ ] Public data (KB items) has read-only policy
+- [ ] Policies cover SELECT, INSERT, UPDATE, DELETE
+
+### Migrations
+- [ ] Migration files are numbered sequentially
+- [ ] Each migration is idempotent (IF NOT EXISTS)
+- [ ] Down migrations are provided
+- [ ] Test migrations on staging before production
+
+### Query Optimization
+- [ ] Use `.select()` with specific columns instead of `*`
+- [ ] Join tables explicitly with `!inner` or `!left`
+- [ ] Filter early in query chain
+- [ ] Use `.range()` for pagination
+- [ ] Use `.limit()` to prevent large result sets
+
+## References
+- Supabase docs: https://supabase.com/docs
+- PostgreSQL JSON: https://www.postgresql.org/docs/current/datatype-json.html
+- RLS guide: https://supabase.com/docs/guides/auth/row-level-security
+- Schema overview: `TODOs.md` (Phase 2.1)
+- Project PRD: `docs/PRD_ideator-books.md` (Section 7)

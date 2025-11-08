@@ -1,0 +1,316 @@
+---
+alwaysApply: true
+description: FastAPI backend API endpoint standards and patterns
+---
+
+# Backend API Standards
+
+## Overview
+Guidelines for implementing RESTful API endpoints in the FastAPI backend. All endpoints follow consistent patterns for request/response handling, error management, and integration with Supabase and LangGraph.
+
+## Domain Knowledge
+
+### API Structure
+- **Upload**: CSV file upload for book library
+- **Books**: Book listing and filtering
+- **Fusion**: Fusion mode preview and recommendation
+- **Runs**: 1p generation job management
+- **Artifacts**: Generated 1p file download
+- **Reminders**: Reminder queue management
+- **History**: User's generated 1p history
+
+### Key Workflows
+1. CSV Upload → Book Selection → Fusion Preview → Run Creation → Progress Tracking → Artifact Download
+2. History View → Remind Card Preview → Reminder Toggle
+
+## Standards & Conventions
+
+### File Structure
+```
+backend/
+├── main.py                    # FastAPI app and global config
+├── core/
+│   ├── config.py             # Pydantic Settings
+│   └── database.py           # Supabase client
+├── api/
+│   └── routes/
+│       ├── upload.py         # POST /api/upload
+│       ├── books.py          # GET /api/books
+│       ├── fusion.py         # POST /api/fusion/preview
+│       ├── runs.py           # POST /api/runs, GET /api/runs/{id}
+│       ├── artifacts.py      # GET /api/artifacts/{id}
+│       ├── reminders.py      # POST /api/reminders
+│       └── history.py        # GET /api/history
+└── models/
+    └── schemas.py            # Request/Response models
+```
+
+### Naming Conventions
+- Route files: `{resource}.py` (singular)
+- Router variable: `router`
+- Route functions: `{verb}_{resource}` (e.g., `create_run`, `get_books`)
+- Response models: `{Resource}Response` (e.g., `BookResponse`, `RunResponse`)
+- Request models: `{Resource}Create` or `{Resource}Update`
+
+## Implementation Patterns
+
+### FastAPI App Setup
+```python
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI(
+    title="Ideator Books API",
+    description="KB-based 1p generation service",
+    version="0.1.0"
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+from api.routes import upload, books, runs, history
+app.include_router(upload.router, prefix="/api", tags=["upload"])
+app.include_router(books.router, prefix="/api", tags=["books"])
+app.include_router(runs.router, prefix="/api", tags=["runs"])
+app.include_router(history.router, prefix="/api", tags=["history"])
+```
+
+### Router Pattern
+```python
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+
+router = APIRouter()
+
+@router.get("/books", response_model=List[BookResponse])
+async def get_books(
+    filters: Optional[str] = None,
+    supabase = Depends(get_supabase)
+):
+    """
+    Get books with optional filters
+    
+    Query params:
+        - filters: JSON string for date/topic/domain filters
+    """
+    try:
+        # Parse filters
+        filter_dict = json.loads(filters) if filters else {}
+        
+        # Query Supabase
+        query = supabase.table("books").select("*")
+        
+        # Apply filters
+        if filter_dict.get("domain"):
+            query = query.eq("domain", filter_dict["domain"])
+        
+        result = query.execute()
+        
+        return result.data
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+```
+
+### Request/Response Models
+```python
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from datetime import datetime
+
+class BookResponse(BaseModel):
+    id: str
+    library_id: str
+    title: str
+    author: str
+    year: int
+    domain: str
+    topic: str
+    summary: str
+    created_at: datetime
+
+class RunCreate(BaseModel):
+    book_ids: List[str] = Field(..., min_items=1, max_items=10)
+    mode: str = Field(..., pattern="^(reduce|simple_merge)$")
+    format: str = Field(..., pattern="^(content|service)$")
+    remind_enabled: bool = False
+
+class RunResponse(BaseModel):
+    id: str
+    user_id: str
+    status: str  # "pending", "running", "completed", "failed"
+    progress: dict  # {"current_node": str, "percent": float}
+    params: dict
+    created_at: datetime
+```
+
+### Background Task Execution
+```python
+from fastapi import BackgroundTasks
+from backend.langgraph_pipeline.graph import graph
+
+@router.post("/runs", response_model=RunResponse)
+async def create_run(
+    run_data: RunCreate,
+    background_tasks: BackgroundTasks,
+    supabase = Depends(get_supabase),
+    user_id: str = Depends(get_current_user)
+):
+    """Create 1p generation run"""
+    
+    # Create run record
+    run = supabase.table("runs").insert({
+        "user_id": user_id,
+        "params_json": run_data.dict(),
+        "status": "pending"
+    }).execute()
+    
+    run_id = run.data[0]["id"]
+    
+    # Add background task
+    background_tasks.add_task(
+        execute_langgraph_pipeline,
+        run_id=run_id,
+        book_ids=run_data.book_ids,
+        mode=run_data.mode,
+        format=run_data.format
+    )
+    
+    return run.data[0]
+
+async def execute_langgraph_pipeline(
+    run_id: str,
+    book_ids: List[str],
+    mode: str,
+    format: str
+):
+    """Execute LangGraph pipeline in background"""
+    try:
+        # Update status
+        update_run_status(run_id, "running")
+        
+        # Execute graph
+        config = {"configurable": {"thread_id": run_id}}
+        inputs = {
+            "book_ids": book_ids,
+            "mode": mode,
+            "format": format
+        }
+        
+        for event in graph.stream(inputs, config):
+            node_name = list(event.keys())[0]
+            # Update progress
+            update_run_progress(run_id, node_name)
+        
+        # Update status
+        update_run_status(run_id, "completed")
+        
+    except Exception as e:
+        update_run_status(run_id, "failed", error=str(e))
+```
+
+### Error Handling
+```python
+from fastapi import HTTPException, status
+
+class APIError(Exception):
+    """Base API exception"""
+    def __init__(self, message: str, status_code: int = 500):
+        self.message = message
+        self.status_code = status_code
+
+def handle_supabase_error(error) -> HTTPException:
+    """Convert Supabase errors to HTTP exceptions"""
+    if "duplicate key" in str(error):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Resource already exists"
+        )
+    elif "foreign key" in str(error):
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid reference"
+        )
+    else:
+        return HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error"
+        )
+```
+
+### Authentication Dependency
+```python
+from fastapi import Depends, HTTPException, Header
+from jose import jwt, JWTError
+
+async def get_current_user(
+    authorization: str = Header(...),
+    supabase = Depends(get_supabase)
+) -> str:
+    """Extract user_id from JWT token"""
+    try:
+        # Remove "Bearer " prefix
+        token = authorization.replace("Bearer ", "")
+        
+        # Verify with Supabase
+        user = supabase.auth.get_user(token)
+        return user.id
+        
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials"
+        )
+```
+
+## Checklist
+
+### New Endpoint Implementation
+- [ ] Router created in `api/routes/{resource}.py`
+- [ ] Route function has docstring with description
+- [ ] Request/Response models defined in `models/schemas.py`
+- [ ] Authentication dependency added if needed
+- [ ] Supabase operations use try-except
+- [ ] HTTP status codes are appropriate
+- [ ] API is included in `main.py`
+
+### Request Validation
+- [ ] Pydantic models validate input
+- [ ] Field constraints (min/max, pattern) are set
+- [ ] Optional fields have defaults
+- [ ] Lists have item limits
+
+### Response Format
+- [ ] Response model matches database schema
+- [ ] Timestamps are datetime objects
+- [ ] Enums use string literals
+- [ ] Nested objects are properly modeled
+
+### Error Handling
+- [ ] Database errors are caught and translated
+- [ ] HTTP exceptions have meaningful messages
+- [ ] 4xx for client errors, 5xx for server errors
+- [ ] Validation errors return 422 with details
+
+### Background Tasks
+- [ ] Long-running operations use BackgroundTasks
+- [ ] Task status is tracked in database
+- [ ] Errors in tasks are logged and stored
+- [ ] Progress updates are atomic
+
+## References
+- FastAPI docs: https://fastapi.tiangolo.com/
+- Pydantic validation: https://docs.pydantic.dev/
+- API endpoints: `TODOs.md` (Phase 2.2)
+- Database schema: `.cursor/rules/database-schema.mdc`
+- Project PRD: `docs/PRD_ideator-books.md` (Section 8)
