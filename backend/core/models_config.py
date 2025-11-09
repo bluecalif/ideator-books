@@ -17,6 +17,7 @@ class ModelsConfig:
     INTEGRATOR_MODEL = "gpt-4.1-mini"
     
     # Producer: 최종 1p 생성
+    # 최종 선정: gpt-4.1-mini (가짜 앵커 0개, anchored_by 70.5%, temperature 완전 제어)
     PRODUCER_MODEL = "gpt-4.1-mini"
     
     # Temperature 설정
@@ -24,6 +25,9 @@ class ModelsConfig:
     REVIEWER_TEMP = 0.3
     INTEGRATOR_TEMP = 0.5
     PRODUCER_TEMP = 0.7
+    
+    # GPT-5 시리즈는 temperature=1.0만 지원
+    GPT5_TEMP = 1.0
 
     @classmethod
     def get_model(cls, node_name: str) -> str:
@@ -38,14 +42,24 @@ class ModelsConfig:
 
     @classmethod
     def get_temperature(cls, node_name: str) -> float:
-        """노드 이름으로 temperature 가져오기"""
+        """노드 이름으로 temperature 가져오기
+        
+        GPT-5 시리즈는 temperature=1.0만 지원하므로 자동 조정
+        """
         mapping = {
             "anchor_mapper": cls.ANCHOR_MAPPER_TEMP,
             "reviewer": cls.REVIEWER_TEMP,
             "integrator": cls.INTEGRATOR_TEMP,
             "producer": cls.PRODUCER_TEMP,
         }
-        return mapping.get(node_name.lower(), 0.5)
+        temp = mapping.get(node_name.lower(), 0.5)
+        
+        # GPT-5 시리즈인 경우 temperature 강제 1.0
+        model = cls.get_model(node_name)
+        if model.startswith("gpt-5"):
+            return cls.GPT5_TEMP
+        
+        return temp
 
 
 # Global instance

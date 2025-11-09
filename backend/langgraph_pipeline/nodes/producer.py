@@ -115,7 +115,10 @@ def generate_onepager_md(
     Returns:
         Markdown 텍스트
     """
-    llm = ChatOpenAI(model=models_config.PRODUCER_MODEL, temperature=models_config.PRODUCER_TEMP)
+    llm = ChatOpenAI(
+        model=models_config.PRODUCER_MODEL, 
+        temperature=models_config.get_temperature("producer")
+    )
 
     system_prompt = f"""당신은 전문가 수준의 1-pager를 작성하는 전문가입니다.
 
@@ -183,9 +186,12 @@ Topic: [topic]
 **중요 규칙:**
 1. 모든 문장에 [anchor_id] 포함
 2. **가짜 앵커 생성 절대 금지** → 제공된 KB 앵커만 사용
-3. 통합지식 앵커 필수 사용
-4. 일반론 금지, 책의 구체적 내용 반영
-5. 외부 프레임워크 언급 금지
+3. **앵커 사용 형식**: 각 앵커는 단독으로 대괄호 안에 포함
+   - 올바른 예: [앵커1] ... [앵커2] ... [앵커3]
+   - 잘못된 예: [앵커1, 앵커2, 앵커3] ← 절대 금지!
+4. 통합지식 앵커 필수 사용
+5. 일반론 금지, 책의 구체적 내용 반영
+6. 외부 프레임워크 언급 금지
 
 **출력 형식:** Markdown"""
 
@@ -230,9 +236,12 @@ Topic: [topic]
 **사용 가능한 KB 앵커 (이것만 사용!):**
 {anchor_list}
 
-**경고**: 위 목록에 없는 앵커를 절대 생성하지 마세요! 
-예를 들어 "투자전략_최적화_001" 같은 가짜 앵커는 절대 금지입니다.
-반드시 위 리스트에 있는 앵커만 사용하세요.
+**경고**: 
+1. 위 목록에 없는 앵커를 절대 생성하지 마세요!
+2. 여러 앵커를 쉼표로 연결하지 마세요! 각 앵커는 단독으로 사용!
+   - 잘못된 예: [경제경영_부동산_도시경제_015, 인문자기계발·일·동기·생산성 통합지식]
+   - 올바른 예: [경제경영_부동산_도시경제_015] ... [인문자기계발·일·동기·생산성 통합지식]
+3. "투자전략_최적화_001" 같은 가짜 앵커는 절대 금지입니다.
 
 위 출발지식과 리뷰를 바탕으로 {format_type} 형식의 완전한 1p 제안서를 작성하세요.
 
@@ -245,7 +254,8 @@ Topic: [topic]
 5. # 최종 1p 제안서 (7요소: 제목/로그라인/대상/약속/포맷/구성/고유문장/CTA)
 
 **중요:**
-- 모든 문장에 [anchor_id] 포함
+- 모든 문장에 [anchor_id] 포함 (한 번에 하나씩!)
+- 여러 앵커를 쉼표로 연결하지 마세요!
 - 도메인 리뷰 카드와 통합 기록 섹션 절대 생략 금지!"""
 
     try:
@@ -273,8 +283,8 @@ def extract_unique_sentences(onepager_md: str) -> list[str]:
     1p에서 고유문장 추출
 
     고유문장 기준:
-    - "고유문장" 섹션에 명시적으로 포함된 문장들
-    - 또는 특별히 표시된 독창적 통찰
+    - "고유문장" 또는 "고유 문장" 섹션에 명시적으로 포함된 문장들
+    - 괄호 포함 형식도 지원 (예: "고유 문장(3)")
 
     Args:
         onepager_md: 1p Markdown 텍스트
@@ -282,19 +292,36 @@ def extract_unique_sentences(onepager_md: str) -> list[str]:
     Returns:
         고유문장 리스트
     """
-    # "고유문장" 섹션 찾기
-    pattern = r"##?\s*고유문장.*?\n(.*?)(?=##|$)"
+    # "고유문장" 또는 "고유 문장(3)" 섹션 찾기 (더 유연한 패턴)
+    pattern = r"##?\s*고유.*?문장.*?\n(.*?)(?=\n##|\Z)"
     match = re.search(pattern, onepager_md, re.DOTALL | re.IGNORECASE)
 
     if match:
         section_text = match.group(1)
-        # 번호 목록 파싱 (1. 2. 3. 또는 - )
+        # 번호 목록 파싱 (1. 2. 3. 또는 - 또는 *)
+        # 각 항목은 번호/기호로 시작하고, 다음 번호/기호 또는 섹션 끝까지 이어짐
         sentences = re.findall(
-            r"(?:^|\n)\s*(?:\d+\.|[-*])\s*(.+?)(?=\n\s*(?:\d+\.|[-*])|\n\n|$)",
+            r"(?:^|\n)\s*(?:\d+\.|[-*])\s*\*?\*?(.+?)(?=\n\s*\d+\.|\n\s*[-*]|\n\n|\Z)",
             section_text,
             re.DOTALL,
         )
-        return [s.strip() for s in sentences if s.strip()]
+        
+        # 정리: 앞뒤 공백, 마크다운 bold (**), 앵커 태그 제거하여 순수 문장만 추출
+        cleaned_sentences = []
+        for s in sentences:
+            # bold 마크 제거
+            cleaned = re.sub(r'\*\*(.+?)\*\*', r'\1', s)
+            # 앵커 태그 제거
+            cleaned = re.sub(r'\(anchored_by:.*?\)', '', cleaned)
+            cleaned = re.sub(r'\[.*?\]', '', cleaned)
+            # 공백 정리
+            cleaned = cleaned.strip()
+            if cleaned and len(cleaned) > 10:  # 너무 짧은 문장 제외
+                cleaned_sentences.append(cleaned)
+        
+        if cleaned_sentences:
+            logger.info(f"[OK] Extracted {len(cleaned_sentences)} unique sentences")
+            return cleaned_sentences
 
     logger.warning("[WARN] No '고유문장' section found in 1p")
     return []

@@ -121,8 +121,11 @@ def review_domain_node(state: OnePagerState, domain: str = None) -> Dict[str, An
         for kb in additional_kb
     ])
     
-    # Structured LLM 생성
-    llm = ChatOpenAI(model=models_config.REVIEWER_MODEL, temperature=models_config.REVIEWER_TEMP)
+    # Structured LLM 생성 (GPT-5 시리즈는 temperature=1.0 자동 적용)
+    llm = ChatOpenAI(
+        model=models_config.REVIEWER_MODEL, 
+        temperature=models_config.get_temperature("reviewer")
+    )
     structured_llm = llm.with_structured_output(DomainReview)
     
     system_prompt = f"""{create_reviewer_prompt(domain)}

@@ -81,7 +81,10 @@ def integrate_reduce_mode(reviews_text: str, format_type: str) -> Dict[str, Any]
     Returns:
         부분 state 업데이트
     """
-    llm = ChatOpenAI(model=models_config.INTEGRATOR_MODEL, temperature=models_config.INTEGRATOR_TEMP)
+    llm = ChatOpenAI(
+        model=models_config.INTEGRATOR_MODEL, 
+        temperature=models_config.get_temperature("integrator")
+    )
     
     system_prompt = f"""당신은 4개 도메인(경제경영, 과학기술, 역사사회, 인문자기계발)의 리뷰를 통합하여 **긴장축(Tension Axes)**을 추출하는 전문가입니다.
 
@@ -178,7 +181,10 @@ def integrate_simple_merge_mode(reviews_text: str, format_type: str) -> Dict[str
     Returns:
         부분 state 업데이트
     """
-    llm = ChatOpenAI(model=models_config.INTEGRATOR_MODEL, temperature=models_config.INTEGRATOR_TEMP)
+    llm = ChatOpenAI(
+        model=models_config.INTEGRATOR_MODEL, 
+        temperature=models_config.get_temperature("integrator")
+    )
     
     system_prompt = f"""당신은 4개 도메인의 리뷰를 병치하고 간단한 결론을 작성하는 전문가입니다.
 

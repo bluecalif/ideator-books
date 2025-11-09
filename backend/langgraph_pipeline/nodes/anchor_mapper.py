@@ -121,7 +121,10 @@ def analyze_anchors(anchor_details: list[Dict], book_summary: str) -> str:
     Returns:
         분석 결과 (합치/상충/누락/경계)
     """
-    llm = ChatOpenAI(model=models_config.ANCHOR_MAPPER_MODEL, temperature=models_config.ANCHOR_MAPPER_TEMP)
+    llm = ChatOpenAI(
+        model=models_config.ANCHOR_MAPPER_MODEL, 
+        temperature=models_config.get_temperature("anchor_mapper")
+    )
 
     # 앵커 내용 요약
     anchor_summary = "\n".join(
