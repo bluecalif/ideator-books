@@ -14,9 +14,37 @@ from backend.langgraph_pipeline.nodes.reviewers import (
 from backend.langgraph_pipeline.nodes.integrator import integrator_node
 from backend.langgraph_pipeline.nodes.producer import producer_node
 from backend.langgraph_pipeline.nodes.validator import validator_node
+from backend.langgraph_pipeline.utils import assemble_final_1p
+from langchain_core.messages import HumanMessage
+from typing import Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def assemble_node(state) -> Dict[str, Any]:
+    """
+    최종 1p 조립 노드
+    
+    역할:
+    - 각 노드 결과를 템플릿으로 조립
+    - LLM 사용 없음 (순수 조립)
+    """
+    logger.info("[START] Assemble")
+    
+    onepager_md = assemble_final_1p(state)
+    
+    logger.info(f"[DONE] Assemble ({len(onepager_md)} chars)")
+    
+    return {
+        "onepager_md": onepager_md,
+        "messages": [
+            HumanMessage(
+                content=f"[Assemble] Final 1p assembled ({len(onepager_md)} chars)",
+                name="Assemble"
+            )
+        ]
+    }
 
 
 def create_workflow() -> StateGraph:
@@ -37,6 +65,7 @@ def create_workflow() -> StateGraph:
     workflow.add_node("review_domain", review_domain_node)
     workflow.add_node("integrator", integrator_node)
     workflow.add_node("producer", producer_node)
+    workflow.add_node("assemble", assemble_node)  # 최종 조립 노드
     workflow.add_node("validator", validator_node)
     
     # 엣지 연결
@@ -54,7 +83,8 @@ def create_workflow() -> StateGraph:
     
     # 순차 실행
     workflow.add_edge("integrator", "producer")
-    workflow.add_edge("producer", "validator")
+    workflow.add_edge("producer", "assemble")  # Producer → Assemble
+    workflow.add_edge("assemble", "validator")  # Assemble → Validator
     
     # Validator → 재시도 또는 종료
     workflow.add_conditional_edges(

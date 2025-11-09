@@ -191,3 +191,81 @@ def calculate_anchored_by_percent(text: str) -> float:
     
     return anchored_count / len(sentences)
 
+
+def assemble_final_1p(state: OnePagerState) -> str:
+    """
+    최종 1p 조립 (템플릿 기반)
+    
+    역할:
+    - 각 노드의 결과를 순서대로 조립
+    - LLM 호출 없음 (순수 템플릿)
+    
+    Args:
+        state: OnePagerState (모든 노드 완료 후)
+    
+    Returns:
+        최종 1p Markdown (전체)
+    """
+    # 1. 출발 지식
+    출발지식 = f"""# 출발 지식
+일련번호: {state.get('book_ids', [0])[0]}
+제목: {state.get('book_title', 'Unknown')}
+저자: {state.get('book_author', 'Unknown')}
+주제: {state.get('book_topic', 'Unknown')}
+요약: {state.get('book_summary', '')[:300]}..."""
+    
+    # 2. 형식 분기
+    형식분기 = f"""# 형식 분기
+{state.get('format_reasoning', 'N/A')}"""
+    
+    # 3. 도메인 리뷰 카드
+    reviews = state.get('reviews', [])
+    리뷰카드_sections = []
+    for i, review in enumerate(reviews):
+        section = f"""## {i+1}) {review.get('domain', 'Unknown')} — 상위 앵커: *{review.get('anchor_id', 'N/A')}*
+* **장점**: {review.get('advantages', 'N/A')}
+* **문제**: {review.get('problems', 'N/A')}
+* **조건**: {review.get('conditions', 'N/A')}"""
+        리뷰카드_sections.append(section)
+    
+    도메인리뷰 = f"""# 도메인 리뷰 카드
+
+{chr(10).join(리뷰카드_sections)}"""
+    
+    # 4. 통합 기록
+    mode = state.get('mode', 'synthesis')
+    if mode == 'synthesis':
+        # 긴장축 기반
+        tension_axes = state.get('tension_axes', [])
+        axes_text = "\n".join([f"{i+1}. {axis}" for i, axis in enumerate(tension_axes)])
+        통합기록 = f"""# 통합 기록 (긴장 축)
+{axes_text}
+
+> **결론**: {state.get('integration_result', '').split('## 결론')[-1].strip() if '## 결론' in state.get('integration_result', '') else 'N/A'}"""
+    else:
+        # 병치 기반
+        통합기록 = f"""# 통합 기록 (4개 관점 병치)
+{state.get('integration_result', 'N/A')}"""
+    
+    # 5. 최종 1p 제안서 (Producer 창작)
+    제안서 = state.get('onepager_proposal', '# 최종 1p 제안서\n(생성 중...)')
+    
+    # 전체 조립
+    final_1p = f"""{출발지식}
+
+---
+
+{형식분기}
+
+{도메인리뷰}
+
+---
+
+{통합기록}
+
+---
+
+{제안서}
+"""
+    
+    return final_1p

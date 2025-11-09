@@ -32,7 +32,7 @@ def integrator_node(state: OnePagerState) -> Dict[str, Any]:
     Integrator 노드
     
     역할:
-    - Reduce 모드: 4개 리뷰 → 긴장축 2-3개 추출
+    - Synthesis 모드: 4개 리뷰 → 긴장축 2-3개 추출
     - Simple Merge 모드: 4개 리뷰 병치 + 결론
     
     Args:
@@ -43,7 +43,7 @@ def integrator_node(state: OnePagerState) -> Dict[str, Any]:
     """
     logger.info("[START] Integrator")
     
-    mode = state.get("mode", "reduce")
+    mode = state.get("mode", "synthesis")
     reviews = state.get("reviews", [])
     format_type = state.get("format", "content")
     
@@ -60,8 +60,8 @@ def integrator_node(state: OnePagerState) -> Dict[str, Any]:
     logger.info(f"[INPUT] Integrator received reviews (first 800 chars):")
     logger.info(formatted_reviews[:800])
     
-    if mode == "reduce":
-        result = integrate_reduce_mode(formatted_reviews, format_type)
+    if mode == "synthesis":
+        result = integrate_synthesis_mode(formatted_reviews, format_type)
     else:  # simple_merge
         result = integrate_simple_merge_mode(formatted_reviews, format_type)
     
@@ -70,9 +70,9 @@ def integrator_node(state: OnePagerState) -> Dict[str, Any]:
     return result
 
 
-def integrate_reduce_mode(reviews_text: str, format_type: str) -> Dict[str, Any]:
+def integrate_synthesis_mode(reviews_text: str, format_type: str) -> Dict[str, Any]:
     """
-    Reduce 모드: 긴장축 추출 (품질 개선 버전)
+    Synthesis 모드: 긴장축 추출 (4개 리뷰 → 2-3개 긴장축)
     
     Args:
         reviews_text: 포맷된 리뷰 텍스트
@@ -128,7 +128,7 @@ def integrate_reduce_mode(reviews_text: str, format_type: str) -> Dict[str, Any]
         estimated_input = len(prompt_text) // 4  # 대략 4자당 1토큰
         estimated_output = len(completion_text) // 4
         
-        logger.info(f"[TOKEN] Integrator(Reduce): "
+        logger.info(f"[TOKEN] Integrator(Synthesis): "
                    f"model={models_config.INTEGRATOR_MODEL}, "
                    f"input~{estimated_input}, "
                    f"output~{estimated_output}, "
@@ -157,14 +157,14 @@ def integrate_reduce_mode(reviews_text: str, format_type: str) -> Dict[str, Any]
             "integration_result": integration_text,
             "messages": [
                 HumanMessage(
-                    content=f"[Integrator-Reduce] {len(tension_axes_list)} tension axes extracted",
+                    content=f"[Integrator-Synthesis] {len(tension_axes_list)} tension axes extracted",
                     name="Integrator"
                 )
             ]
         }
     
     except Exception as e:
-        logger.error(f"[FAIL] Reduce mode integration error: {e}")
+        logger.error(f"[FAIL] Synthesis mode integration error: {e}")
         return {
             "error_message": f"Integration failed: {str(e)}"
         }

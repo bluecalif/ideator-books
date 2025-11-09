@@ -82,7 +82,8 @@
 
 **구현 핵심:**
 - Reviewers: functools.partial + Send() API로 병렬 실행
-- Integrator: Pydantic 모델로 structured output
+- Integrator: Pydantic 모델로 structured output (synthesis 모드)
+- Producer: 조립(템플릿) + 창작(LLM)으로 분리
 - Validator: 정규식 + 카운팅, 실패 시 에러 메시지
 
 ### 1.5 1p 품질 개선 (모범 사례 대비)
@@ -149,14 +150,28 @@
 6. ✅ 강력한 고유문장 3개 (생성 및 추출 성공)
 7. ✅ 실제 KB 앵커 (가짜 앵커 0개)
 
-### 1.6 Fusion Helper
+### 1.6 아키텍처 정리 (Fusion 모드 명확화)
+
+**핵심 결정:**
+- ❌ "reduce" 이름 폐기 → ✅ "synthesis" 통일 (긴장축 3개 추출)
+- ❌ Fusion Helper 복잡한 구현 → ✅ Phase 2 API에서 간단 추천만
+- ✅ Producer 역할 명확화: 1p 제안서 창작만 (조립 로직 분리)
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 1.6.1 | Fusion Helper 서비스 | ⏳ TODO | 모드 추천 로직 (Reduce vs 단순병합) |
-| 1.6.2 | 샘플 2문장 생성 | ⏳ TODO | 각 모드별 미리보기 |
-| 1.6.3 | ✅ 테스트: Fusion Helper 실행 | ⏳ TODO | 3권 샘플로 추천 검증 |
-| 1.6.4 | 🔄 Git Commit: "Phase 1 완료" | ⏳ TODO | 백엔드 핵심 로직 |
+| 1.6.1 | 모드 이름 변경 (reduce → synthesis) | ✅ DONE | state.py, integrator.py, test 코드 변경 완료 |
+| 1.6.2 | Producer 리팩토링 | ✅ DONE | Input 최소화 (integration_result + book_summary), 제안서만 창작 |
+| 1.6.3 | 최종 1p 조립 함수 분리 | ✅ DONE | utils.assemble_final_1p() + graph.assemble_node() |
+| 1.6.4 | ✅ 테스트: 리팩토링 검증 | ✅ DONE | 9개 노드, 가짜 앵커 0개, anchored_by 63.0% |
+| 1.6.5 | 🔄 Git Commit: "Phase 1.6 완료" | 🚧 IN PROGRESS | 아키텍처 정리 |
+
+**Phase 1.6 성과:**
+- ✅ **모드 명확화**: "synthesis" (긴장축 3개) vs "simple_merge" (4개 병치)
+- ✅ **Producer 역할 분리**: 제안서 창작만 (조립 로직 분리)
+- ✅ **Assemble 노드 추가**: 템플릿 기반 조립 (9개 노드)
+- ✅ **Input 최소화**: integration_result + book_summary만
+- ✅ **스트리밍 가능 구조**: 각 노드 결과 독립적 표시 가능
+- ⚠️ **anchored_by**: 70.5% → 63.0% (조립 과정에서 약간 감소, 추후 개선 가능)
 
 ---
 

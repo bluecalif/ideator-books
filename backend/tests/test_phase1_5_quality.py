@@ -22,6 +22,7 @@ from backend.services.kb_service import kb_service
 from backend.services.book_service import book_service
 from backend.langgraph_pipeline.state import create_initial_state
 from backend.langgraph_pipeline.graph import graph
+from backend.langgraph_pipeline.utils import assemble_final_1p
 from backend.core.models_config import models_config
 
 # 모델명 가져오기 (파일명에 사용)
@@ -116,7 +117,7 @@ def test_phase1_5_quality():
     # State 생성
     initial_state = create_initial_state(
         book_ids=[test_book['id']],
-        mode="reduce",  # Reduce 모드 테스트
+        mode="synthesis",  # Synthesis 모드 테스트
         format="content",  # 콘텐츠형
         remind_enabled=False,
         book_summary=test_book['summary'],
@@ -174,11 +175,11 @@ def test_phase1_5_quality():
                 print(f"      - 긴장축: {len(tension_axes)}개 추출")
             
             elif node_name == "producer":
-                onepager_length = len(node_data.get("onepager_md", ""))
+                proposal_length = len(node_data.get("onepager_proposal", ""))
                 unique_count = len(node_data.get("unique_sentences", []))
-                logger.info(f"  1p length: {onepager_length} chars")
+                logger.info(f"  1p proposal length: {proposal_length} chars")
                 logger.info(f"  Unique sentences: {unique_count}개")
-                print(f"      - 1p 생성 완료: {onepager_length} chars")
+                print(f"      - 1p 제안서 생성 완료: {proposal_length} chars")
                 print(f"      - 고유문장: {unique_count}개")
             
             elif node_name == "validator":
@@ -205,18 +206,19 @@ def test_phase1_5_quality():
         logger.error(f"Pipeline error: {e}", exc_info=True)
         return False
     
-    # 4. 결과 저장
-    print("\n[4/5] 결과 저장 중...")
+    # 4. 최종 1p 조립 및 저장
+    print("\n[4/5] 최종 1p 조립 및 저장 중...")
     
-    if not producer_output or "onepager_md" not in producer_output:
-        print("❌ Producer 출력이 없습니다")
+    final_state = graph.get_state(config).values
+    
+    # 최종 조립
+    onepager_md = assemble_final_1p(final_state)
+    
+    if not onepager_md or len(onepager_md) < 100:
+        print("❌ 1p 조립 실패")
         return False
     
-    onepager_md = producer_output["onepager_md"]
-    
-    if not onepager_md:
-        print("❌ 1p가 비어 있습니다")
-        return False
+    print(f"✅ 1p 조립 완료: {len(onepager_md)} chars")
     output_file = Path(__file__).parent / "output" / f"1p_{model_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
     
     with open(output_file, 'w', encoding='utf-8') as f:

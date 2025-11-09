@@ -19,7 +19,7 @@ class OnePagerState(TypedDict):
     book_title: Optional[str]  # 책 제목
     book_author: Optional[str]  # 저자
     book_topic: Optional[str]  # 주제
-    mode: str  # "reduce" or "simple_merge"
+    mode: str  # "synthesis" (긴장축 3개) or "simple_merge" (4개 병치)
     format: str  # "content" or "service"
     remind_enabled: bool  # 리마인드 활성화 여부
     
@@ -40,7 +40,8 @@ class OnePagerState(TypedDict):
     format_reasoning: Optional[str]  # 형식 분기 사유
     
     # === Producer 결과 ===
-    onepager_md: Optional[str]  # 생성된 1p (Markdown)
+    onepager_proposal: Optional[str]  # 1p 제안서 (제목~CTA, Producer 창작)
+    onepager_md: Optional[str]  # 최종 조립된 완전한 1p (Markdown)
     onepager_pdf_url: Optional[str]  # PDF URL (생성 후)
     unique_sentences: Annotated[List[str], operator.add]  # 고유문장 (누적)
     
