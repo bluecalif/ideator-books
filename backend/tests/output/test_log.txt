@@ -1,0 +1,36 @@
+============================================================
+LangGraph Pipeline Test Results
+============================================================
+
+Test Time: 2025-11-08 23:43:59
+Total Execution Time: 54.23s
+Executed Nodes: 8
+Retry Count: 1
+
+Node Execution Times:
+  - anchor_mapper: 9.62s
+  - review_domain: 9.50s
+  - review_domain: 0.00s
+  - review_domain: 1.84s
+  - review_domain: 0.66s
+  - integrator: 8.60s
+  - producer: 23.98s
+  - validator: 0.01s
+
+Anchors:
+  - 경제경영: 경제경영_소비자마케팅_트렌드_025
+  - 과학기술: 과학기술_물리_수학_에너지_016
+  - 역사사회: 역사사회_노동·조직_032
+  - 인문자기계발: 인문자기계발_감정·심리_021
+
+Reviews: 4 reviews
+
+Validation Results:
+  - Anchored by: 77.8%
+  - Unique sentences: 3
+  - External frames: 0
+  - Validation passed: False
+
+Validation Errors:
+  - anchored_by: 77.8% (목표: 100%)
+  - 유효하지 않은 앵커: ['투자전략_최적화_001', '통합기록_투자전략_002', '통합기록_투자전략_003']

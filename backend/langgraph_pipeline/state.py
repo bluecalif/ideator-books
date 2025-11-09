@@ -14,7 +14,10 @@ class OnePagerState(TypedDict):
     """
     
     # === 입력 파라미터 ===
-    book_ids: List[str]  # 선택된 도서 ID 목록
+    book_ids: List[str]  # 선택된 도서 ID 목록 (1권만 처리)
+    book_summary: Optional[str]  # 단일 책 요약
+    book_title: Optional[str]  # 책 제목
+    book_topic: Optional[str]  # 주제
     mode: str  # "reduce" or "simple_merge"
     format: str  # "content" or "service"
     remind_enabled: bool  # 리마인드 활성화 여부
@@ -57,12 +60,18 @@ def create_initial_state(
     book_ids: List[str],
     mode: str,
     format: str,
-    remind_enabled: bool = False
+    remind_enabled: bool = False,
+    book_summary: Optional[str] = None,
+    book_title: Optional[str] = None,
+    book_topic: Optional[str] = None
 ) -> OnePagerState:
     """초기 State 생성"""
     return OnePagerState(
         # 입력
         book_ids=book_ids,
+        book_summary=book_summary,
+        book_title=book_title,
+        book_topic=book_topic,
         mode=mode,
         format=format,
         remind_enabled=remind_enabled,

@@ -53,40 +53,78 @@
 | 1.3.3 | 체크포인트 저장 (MemorySaver) | ✅ DONE | compile_graph with checkpointer |
 | 1.3.4 | 노드 유틸리티 함수 (utils.py) | ✅ DONE | agent_node, 검증, 로깅 헬퍼 |
 | 1.3.5 | ✅ (테스트 생략) Phase 1.4에서 통합 테스트 | N/A | 노드 미구현으로 단독 실행 불가 |
-| 1.3.6 | 🔄 Git Commit: "LangGraph State 정의" | ⏳ TODO | State + 그래프 골격 + 유틸리티 |
+| 1.3.6 | 🔄 Git Commit: "LangGraph State 정의" | ✅ DONE | State + 그래프 골격 + 유틸리티 |
 
 ### 1.4 LangGraph 노드 구현
 
 | ID | 작업 내용 | Status | 구현 패턴 | 비고 |
 |----|----------|--------|----------|------|
-| 1.4.1 | AnchorMapper | ⏳ TODO | LLM + KB 검색 | 도서→4도메인 앵커 매핑 |
-| 1.4.2 | Reviewer_경제경영 | ⏳ TODO | create_react_agent | 장점·문제·조건 |
-| 1.4.3 | Reviewer_과학기술 | ⏳ TODO | create_react_agent | 장점·문제·조건 |
-| 1.4.4 | Reviewer_역사사회 | ⏳ TODO | create_react_agent | 장점·문제·조건 |
-| 1.4.5 | Reviewer_인문자기계발 | ⏳ TODO | create_react_agent | 장점·문제·조건 |
-| 1.4.6 | Integrator (Reduce) | ⏳ TODO | LLM structured output | 긴장축 2-3 + 결론 |
-| 1.4.7 | Integrator (단순병합) | ⏳ TODO | 병치 로직 | 4도메인 병치 + 결론 |
-| 1.4.8 | Producer (MD) | ⏳ TODO | LLM + 템플릿 | 동적 레이아웃 |
-| 1.4.9 | Producer (PDF) | ⏳ TODO | reportlab | MD → PDF |
-| 1.4.10 | Validator | ⏳ TODO | 규칙 기반 | anchored_by=100%, 고유문장≥3 |
-| 1.4.11 | ✅ 테스트: 단일 노드 테스트 (AnchorMapper) | ⏳ TODO | 실제 KB 데이터 사용 |
-| 1.4.12 | ✅ 테스트: 전체 파이프라인 실행 | ⏳ TODO | 샘플 도서 요약으로 end-to-end |
-| 1.4.13 | 🔄 Git Commit: "LangGraph 노드 구현 완료" | ⏳ TODO | 5개 노드 + 테스트 |
+| 1.4.1 | AnchorMapper | ✅ DONE | LLM + KB 검색 | 도서→4도메인 앵커 매핑, 분석 |
+| 1.4.2 | Reviewer_경제경영 | ✅ DONE | create_react_agent | functools.partial |
+| 1.4.3 | Reviewer_과학기술 | ✅ DONE | create_react_agent | functools.partial |
+| 1.4.4 | Reviewer_역사사회 | ✅ DONE | create_react_agent | functools.partial |
+| 1.4.5 | Reviewer_인문자기계발 | ✅ DONE | create_react_agent | functools.partial |
+| 1.4.6 | Integrator (Reduce) | ✅ DONE | LLM structured output | TensionAxis Pydantic 모델 |
+| 1.4.7 | Integrator (단순병합) | ✅ DONE | 병치 로직 | 4도메인 병치 + 결론 |
+| 1.4.8 | Producer (MD) | ✅ DONE | LLM + 템플릿 | 동적 레이아웃, 고유문장 추출 |
+| 1.4.9 | Producer (PDF) | 🔄 REVIEW | reportlab | Placeholder (Phase 2에서 완성) |
+| 1.4.10 | Validator | ✅ DONE | 규칙 기반 | anchored_by/고유문장/외부프레임 검증 |
+| 1.4.11 | ✅ 테스트: 단일 노드 테스트 (AnchorMapper) | ✅ DONE | 4개 도메인 앵커 매핑 성공 + AI 분석 |
+| 1.4.12 | CSV 로더 작성 (book_service.py) | ✅ DONE | 87권 로드, 도메인별 통계 |
+| 1.4.13 | 1권당 1p 생성 구조로 변경 (핵심!) | ✅ DONE | 3권 → 3개 1p (각 50초, 총 150초) |
+| 1.4.14 | 재시도 로직 제거 | ✅ DONE | Validator 실패해도 1회만 실행 |
+| 1.4.15 | 모든 LLM gpt-4o-mini로 통일 | ✅ DONE | 비용 절감 (15배) |
+| 1.4.16 | 노드별 시간 측정 및 중간 결과 출력 | ✅ DONE | 각 노드 시간/결과 출력, 파일 저장 |
+| 1.4.17 | ✅ 테스트: 1권당 1p 생성 (1권) | ✅ DONE | 54초, 8개 노드, 1,708자 |
+| 1.4.18 | book_summary State 전달 개선 | ✅ DONE | book_summaries → book_summary/title/topic |
+| 1.4.19 | 디버그 로그 추가 | ✅ DONE | AnchorMapper, Reviewer 입력 확인 |
+| 1.4.20 | 🔄 Git Commit: "LangGraph 노드 구현 완료" | ⏳ TODO | 5개 노드 + 1권당 1p + 테스트 |
 
 **구현 핵심:**
 - Reviewers: functools.partial + Send() API로 병렬 실행
 - Integrator: Pydantic 모델로 structured output
 - Validator: 정규식 + 카운팅, 실패 시 에러 메시지
 
-### 1.5 Fusion Helper
+### 1.5 1p 품질 개선 (모범 사례 대비)
+
+**현재 문제점:**
+- ❌ 형식 분기 사유가 일반적
+- ❌ 도메인 리뷰가 피상적 (책 내용과 연결 약함)
+- ❌ 개별 인사이트 앵커만 사용 (통합지식 없음)
+- ❌ 긴장축이 일반적
+- ❌ 1p 제안서 없음 (제목, 로그라인, 대상, 포맷, 구성, CTA)
+- ❌ 고유문장이 약함
+- ❌ 가짜 앵커 생성 (예: `투자전략_최적화_001`)
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 1.5.1 | Fusion Helper 서비스 | ⏳ TODO | 모드 추천 로직 (Reduce vs 단순병합) |
-| 1.5.2 | 샘플 2문장 생성 | ⏳ TODO | 각 모드별 미리보기 |
-| 1.5.3 | ✅ 테스트: Fusion Helper 실행 | ⏳ TODO | 3권 샘플로 추천 검증 |
-| 1.5.4 | 🔄 Git Commit: "Phase 1 완료" | ⏳ TODO | 백엔드 핵심 로직 |
-| 1.5.5 | 📋 Phase 1 후속 검토: KB 통합지식 파싱 추가 여부 | ⏳ TODO | LangGraph 완성 후 Integrator 노드에서 필요성 판단. 현재는 128개 개별 인사이트만 사용 |
+| 1.5.1 | 모범 사례 분석 및 품질 기준 정의 | ⏳ TODO | docs/1p사례.md 참고 |
+| 1.5.2 | KB 통합지식 파싱 및 활용 | ⏳ TODO | "통합지식" 섹션 → 상위 앵커 |
+| 1.5.3 | Producer 프롬프트 개선 (1p 제안서) | ⏳ TODO | 제목/로그라인/대상/포맷/구성/CTA 생성 |
+| 1.5.4 | 고유문장 품질 강화 | ⏳ TODO | 더 강력하고 인상적인 문장 생성 |
+| 1.5.5 | 가짜 앵커 생성 방지 | ⏳ TODO | Producer가 KB 앵커만 사용하도록 |
+| 1.5.6 | Reviewer 프롬프트 강화 | ⏳ TODO | 책 내용을 깊이 있게 분석하도록 |
+| 1.5.7 | Integrator 긴장축 개선 | ⏳ TODO | 더 명확한 대립/경계 관계 |
+| 1.5.8 | ✅ 테스트: 품질 비교 (모범 사례 대비) | ⏳ TODO | 7가지 기준으로 평가 |
+| 1.5.9 | 🔄 Git Commit: "1p 품질 개선 완료" | ⏳ TODO | Producer + Reviewer + Integrator 개선 |
+
+**목표 품질 기준 (모범 사례 수준):**
+1. ✅ 구체적인 형식 분기 (도구형/이야기형/분석형)
+2. ✅ 풍부한 도메인 리뷰 (책 내용 깊이 반영)
+3. ✅ 통합지식 앵커 활용
+4. ✅ 명확한 긴장축 (대립/상충/경계)
+5. ✅ 완성된 1p 제안서 (7개 요소)
+6. ✅ 강력한 고유문장 (인상적, 기억에 남음)
+7. ✅ 100% 실제 KB 앵커 (가짜 앵커 0개)
+
+### 1.6 Fusion Helper
+
+| ID | 작업 내용 | Status | 비고 |
+|----|----------|--------|------|
+| 1.6.1 | Fusion Helper 서비스 | ⏳ TODO | 모드 추천 로직 (Reduce vs 단순병합) |
+| 1.6.2 | 샘플 2문장 생성 | ⏳ TODO | 각 모드별 미리보기 |
+| 1.6.3 | ✅ 테스트: Fusion Helper 실행 | ⏳ TODO | 3권 샘플로 추천 검증 |
+| 1.6.4 | 🔄 Git Commit: "Phase 1 완료" | ⏳ TODO | 백엔드 핵심 로직 |
 
 ---
 
