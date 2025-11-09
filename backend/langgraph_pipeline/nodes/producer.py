@@ -3,6 +3,7 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.langgraph_pipeline.state import OnePagerState
+from backend.core.models_config import models_config
 from typing import Dict, Any, Optional
 import logging
 import re
@@ -33,6 +34,13 @@ def producer_node(state: OnePagerState) -> Dict[str, Any]:
     integration_result = state.get("integration_result", "")
     tension_axes = state.get("tension_axes", [])
     available_anchors = state.get("available_anchors", [])
+    
+    # 책 정보
+    book_ids = state.get("book_ids", [])
+    book_title = state.get("book_title", "Unknown")
+    book_author = state.get("book_author", "Unknown")
+    book_topic = state.get("book_topic", "Unknown")
+    book_summary = state.get("book_summary", "")
 
     if not reviews or not integration_result:
         logger.error("[FAIL] Missing reviews or integration result")
@@ -49,6 +57,11 @@ def producer_node(state: OnePagerState) -> Dict[str, Any]:
         mode=mode,
         format_type=format_type,
         available_anchors=available_anchors,
+        book_id=book_ids[0] if book_ids else 0,
+        book_title=book_title,
+        book_author=book_author,
+        book_topic=book_topic,
+        book_summary=book_summary,
     )
 
     # 고유문장 추출
@@ -77,9 +90,14 @@ def generate_onepager_md(
     mode: str,
     format_type: str,
     available_anchors: list[str],
+    book_id: int,
+    book_title: str,
+    book_author: str,
+    book_topic: str,
+    book_summary: str,
 ) -> str:
     """
-    1p Markdown 생성 (품질 개선 버전: 1p 제안서 7요소 구조)
+    1p Markdown 생성 (품질 개선 버전: 1p 제안서 7요소 구조 + 출발지식)
 
     Args:
         reviews: 4개 도메인 리뷰
@@ -88,18 +106,34 @@ def generate_onepager_md(
         mode: reduce or simple_merge
         format_type: content or service
         available_anchors: 사용 가능한 KB 앵커 리스트
+        book_id: 도서 ID
+        book_title: 제목
+        book_author: 저자
+        book_topic: 주제
+        book_summary: 요약
 
     Returns:
         Markdown 텍스트
     """
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+    llm = ChatOpenAI(model=models_config.PRODUCER_MODEL, temperature=models_config.PRODUCER_TEMP)
 
     system_prompt = f"""당신은 전문가 수준의 1-pager를 작성하는 전문가입니다.
 
 **필수 구조 (docs/1p사례.md 기준):**
 
+# 출발 지식
+일련번호: [book_id]
+제목: [book_title]
+연도: [year]
+저자: [book_author]
+구분: [domain]
+Topic: [topic]
+요약: [book_summary 첫 200-300자]
+
+---
+
 # 형식 분기
-**{format_type}형** — 구체적이고 설득력 있는 선정 사유 1줄
+**{format_type}형** — 구체적이고 설득력 있는 선정 사유 1줄 (책의 구체적 내용 기반)
 
 # 도메인 리뷰 카드
 ## 1) [도메인] — 상위 앵커: *[통합지식 anchor]*
@@ -165,13 +199,29 @@ def generate_onepager_md(
             for r in reviews
         ]
     )
+    
+    # 입력 리뷰 로깅 (디버깅용)
+    logger.info(f"[INPUT] Producer received reviews (first 600 chars):")
+    logger.info(review_summary[:600])
 
     # 사용 가능한 앵커 리스트 (처음 50개만 예시로 제공)
     anchor_list = "\n".join([f"- {a}" for a in available_anchors[:50]])
     if len(available_anchors) > 50:
         anchor_list += f"\n... 외 {len(available_anchors) - 50}개 더"
     
-    user_prompt = f"""4개 도메인 리뷰:
+    # 책 요약 첫 300자 (출발지식 섹션용)
+    summary_preview = book_summary[:300] + ("..." if len(book_summary) > 300 else "")
+    
+    user_prompt = f"""**출발지식 (반드시 맨 위에 포함):**
+일련번호: {book_id}
+제목: {book_title}
+저자: {book_author}
+주제: {book_topic}
+요약: {summary_preview}
+
+---
+
+4개 도메인 리뷰:
 {review_summary}
 
 통합 결과:
@@ -184,14 +234,32 @@ def generate_onepager_md(
 예를 들어 "투자전략_최적화_001" 같은 가짜 앵커는 절대 금지입니다.
 반드시 위 리스트에 있는 앵커만 사용하세요.
 
-위 내용을 바탕으로 {format_type} 형식의 완전한 1p 제안서를 작성하세요.
-7요소 구조(제목/로그라인/대상/약속/포맷/구성/CTA)를 모두 포함하고,
-모든 문장에 실제 KB [anchor_id]를 포함하세요."""
+위 출발지식과 리뷰를 바탕으로 {format_type} 형식의 완전한 1p 제안서를 작성하세요.
+
+**필수 섹션 (반드시 순서대로 모두 포함!):**
+
+1. # 출발 지식 (위 정보 그대로)
+2. # 형식 분기 (선정 사유 1줄 - 책의 구체적 내용 기반)
+3. # 도메인 리뷰 카드 (4개 도메인별로 장점/문제/조건 포함)
+4. # 통합 기록 (긴장축 2-3개 + 결론 1줄)
+5. # 최종 1p 제안서 (7요소: 제목/로그라인/대상/약속/포맷/구성/고유문장/CTA)
+
+**중요:**
+- 모든 문장에 [anchor_id] 포함
+- 도메인 리뷰 카드와 통합 기록 섹션 절대 생략 금지!"""
 
     try:
         response = llm.invoke(
             [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
         )
+        
+        # 토큰 사용량 로깅
+        usage = response.response_metadata.get('usage', {})
+        logger.info(f"[TOKEN] Producer: "
+                   f"model={models_config.PRODUCER_MODEL}, "
+                   f"input={usage.get('prompt_tokens', 0)}, "
+                   f"output={usage.get('completion_tokens', 0)}, "
+                   f"total={usage.get('total_tokens', 0)}")
 
         return response.content
 

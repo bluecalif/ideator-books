@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from backend.langgraph_pipeline.state import OnePagerState
 from backend.langgraph_pipeline.utils import format_review_for_integrator
+from backend.core.models_config import models_config
 from typing import Dict, Any
 import logging
 
@@ -55,6 +56,10 @@ def integrator_node(state: OnePagerState) -> Dict[str, Any]:
     # 리뷰 포맷팅
     formatted_reviews = format_review_for_integrator(reviews)
     
+    # 입력 리뷰 로깅 (디버깅용)
+    logger.info(f"[INPUT] Integrator received reviews (first 800 chars):")
+    logger.info(formatted_reviews[:800])
+    
     if mode == "reduce":
         result = integrate_reduce_mode(formatted_reviews, format_type)
     else:  # simple_merge
@@ -76,7 +81,7 @@ def integrate_reduce_mode(reviews_text: str, format_type: str) -> Dict[str, Any]
     Returns:
         부분 state 업데이트
     """
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.5)
+    llm = ChatOpenAI(model=models_config.INTEGRATOR_MODEL, temperature=models_config.INTEGRATOR_TEMP)
     
     system_prompt = f"""당신은 4개 도메인(경제경영, 과학기술, 역사사회, 인문자기계발)의 리뷰를 통합하여 **긴장축(Tension Axes)**을 추출하는 전문가입니다.
 
@@ -112,6 +117,19 @@ def integrate_reduce_mode(reviews_text: str, format_type: str) -> Dict[str, Any]
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_prompt)
         ])
+        
+        # 토큰 사용량 로깅 (Structured output은 response_metadata에 없을 수 있음)
+        # 대략적인 토큰 수 계산
+        prompt_text = system_prompt + user_prompt
+        completion_text = str(response.model_dump())
+        estimated_input = len(prompt_text) // 4  # 대략 4자당 1토큰
+        estimated_output = len(completion_text) // 4
+        
+        logger.info(f"[TOKEN] Integrator(Reduce): "
+                   f"model={models_config.INTEGRATOR_MODEL}, "
+                   f"input~{estimated_input}, "
+                   f"output~{estimated_output}, "
+                   f"total~{estimated_input + estimated_output}")
         
         # State 업데이트
         tension_axes_list = [
@@ -160,7 +178,7 @@ def integrate_simple_merge_mode(reviews_text: str, format_type: str) -> Dict[str
     Returns:
         부분 state 업데이트
     """
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+    llm = ChatOpenAI(model=models_config.INTEGRATOR_MODEL, temperature=models_config.INTEGRATOR_TEMP)
     
     system_prompt = f"""당신은 4개 도메인의 리뷰를 병치하고 간단한 결론을 작성하는 전문가입니다.
 
@@ -182,6 +200,14 @@ def integrate_simple_merge_mode(reviews_text: str, format_type: str) -> Dict[str
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_prompt)
         ])
+        
+        # 토큰 사용량 로깅
+        usage = response.response_metadata.get('usage', {})
+        logger.info(f"[TOKEN] Integrator(SimpleMerge): "
+                   f"model={models_config.INTEGRATOR_MODEL}, "
+                   f"input={usage.get('prompt_tokens', 0)}, "
+                   f"output={usage.get('completion_tokens', 0)}, "
+                   f"total={usage.get('total_tokens', 0)}")
         
         integration_text = f"""## 4개 도메인 리뷰 (병치)
 

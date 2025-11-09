@@ -87,7 +87,7 @@
 
 ### 1.5 1p 품질 개선 (모범 사례 대비)
 
-**현재 문제점:**
+**초기 문제점:**
 - ❌ 형식 분기 사유가 일반적
 - ❌ 도메인 리뷰가 피상적 (책 내용과 연결 약함)
 - ❌ 개별 인사이트 앵커만 사용 (통합지식 없음)
@@ -107,24 +107,44 @@
 | ID | 작업 내용 | Status | 구현 대상 | 비고 |
 |----|----------|--------|----------|------|
 | 1.5.1 | 모범 사례 분석 및 품질 기준 정의 | ✅ DONE | - | docs/1p사례.md 기준 확립, .cursor/rules 생성 |
-| 1.5.2 | KB 통합지식 파싱 및 활용 | ✅ DONE | kb_service.py, schemas.py | "통합지식" 섹션 파싱, is_integrated_knowledge 필드, 우선순위 검색 |
-| 1.5.3 | State에 available_anchors 추가 | ✅ DONE | state.py | 가짜 앵커 방지용 필드 추가 |
-| 1.5.4 | AnchorMapper 앵커 리스트 전달 | ✅ DONE | anchor_mapper.py | 사용 가능한 모든 KB 앵커 State에 저장 |
-| 1.5.5 | Reviewer 프롬프트 강화 | ✅ DONE | reviewers.py | 통합지식 우선, 책 내용과 KB 구체적 연결, 일반론 금지 |
-| 1.5.6 | Integrator 긴장축 개선 | ✅ DONE | integrator.py | 명확한 대립/상충/경계 관계, 모범 예시 포함 |
-| 1.5.7 | Producer 프롬프트 전면 개편 | ✅ DONE | producer.py | 1p 제안서 7요소 구조, 가짜 앵커 방지, available_anchors 전달 |
-| 1.5.8 | Validator 가짜 앵커 검증 추가 | ✅ DONE | validator.py | validate_fake_anchors() 로직, fake_anchor_count 검증 |
-| 1.5.9 | ✅ 테스트: 품질 비교 (모범 사례 대비) | ⏳ TODO | test_integrated_knowledge.py | 통합지식 파싱 테스트 작성, 품질 테스트는 수동 |
-| 1.5.10 | 🔄 Git Commit: "1p 품질 개선 완료" | 🚧 IN PROGRESS | - | 모든 노드 개선 완료 |
+| 1.5.2 | KB 통합지식 파싱 및 활용 | ✅ DONE | kb_service.py, schemas.py | "통합지식" 섹션 파싱, is_integrated_knowledge 필드, 가중치 0.05 |
+| 1.5.3 | State에 available_anchors, book_author 추가 | ✅ DONE | state.py | 가짜 앵커 방지, 저자 정보 전달 |
+| 1.5.4 | AnchorMapper 앵커 리스트 전달 | ✅ DONE | anchor_mapper.py | 144개 KB 앵커 State에 저장, 모델 설정 분리 |
+| 1.5.5 | Reviewer → Structured Output 변경 | ✅ DONE | reviewers.py | Agent 제거, DomainReview Pydantic, 책 내용 중심 프롬프트 강화 |
+| 1.5.6 | Integrator 긴장축 개선 | ✅ DONE | integrator.py | 명확한 대립/상충/경계, 모범 예시, 모델 설정 |
+| 1.5.7 | Producer "출발 지식" + 섹션 명시 | ✅ DONE | producer.py | 출발지식 섹션, 도메인 리뷰 카드, 통합 기록 명시, 모델 설정 |
+| 1.5.8 | Validator 가짜 앵커 검증 추가 | ✅ DONE | validator.py | validate_fake_anchors() 로직 |
+| 1.5.9 | LLM 모델 설정 분리 | ✅ DONE | models_config.py | 노드별 모델/Temperature 관리 |
+| 1.5.10 | CSV "요약" 컬럼 사용 | ✅ DONE | test_phase1_5_quality.py | 100권 노션 원본_수정.csv |
+| 1.5.11 | 상세 로깅 추가 | ✅ DONE | reviewers.py, integrator.py, producer.py | 입력/출력 500-800자 로깅 |
+| 1.5.12 | Cursor 룰 생성 | ✅ DONE | llm-model-evaluation.mdc, AGENTS.md | 모델 비교, 인코딩 규칙 |
+| 1.5.13 | ✅ 테스트: gpt-4.1-mini 평가 | ✅ DONE | - | anchored_by 62.2%, 구조 12/12, 달성률 50% |
+| 1.5.14 | 🔄 모델 비교 테스트 (gpt-5-mini, gpt-4o-mini) | ⏳ TODO | - | 3개 모델 비교 |
+| 1.5.15 | 가짜 앵커 방지 강화 | ⏳ TODO | producer.py | 쉼표 연결 금지 프롬프트 |
+| 1.5.16 | 고유문장 추출 regex 수정 | ⏳ TODO | producer.py | extract_unique_sentences() |
+| 1.5.17 | 🔄 Git Commit: "Phase 1.5 진행 중" | 🚧 IN PROGRESS | - | 주요 개선 완료, 테스트 진행 중 |
 
-**목표 품질 기준 (모범 사례 수준):**
-1. ✅ 구체적인 형식 분기 (도구형/이야기형/분석형)
-2. ✅ 풍부한 도메인 리뷰 (책 내용 깊이 반영)
+**현재 성과 (2025-11-09, gpt-4.1-mini):**
+- ✅ **구조 완성**: 12/12 섹션 (출발지식, 형식분기, 도메인 리뷰 카드, 통합 기록, 최종 1p)
+- ✅ **anchored_by**: 18.2% → **62.2%** (3.4배 개선)
+- ✅ **앵커 사용**: 11회 → **24회** (2.2배)
+- ✅ **고유 앵커**: 3개 → **8개** (2.7배)
+- ✅ **달성률**: 33% → **50%** (+17%p)
+- ✅ **Reviewer 책 내용 반영**: "1000년경 사하라 무역", "바이킹 아메리카 탐험" 등 구체적 사례 포함
+
+**남은 과제:**
+- ❌ **가짜 앵커 3개**: 쉼표로 여러 앵커 연결 (`[앵커1, 앵커2, 앵커3]`)
+- ❌ **고유문장 추출 0개**: regex 버그 (실제로는 49-52줄에 3개 존재)
+- ❌ **anchored_by 62.2%**: 목표 100% 미달
+
+**목표 품질 기준:**
+1. ✅ 구체적인 형식 분기
+2. ✅ 풍부한 도메인 리뷰 (책 내용 반영)
 3. ✅ 통합지식 앵커 활용
-4. ✅ 명확한 긴장축 (대립/상충/경계)
-5. ✅ 완성된 1p 제안서 (7개 요소)
-6. ✅ 강력한 고유문장 (인상적, 기억에 남음)
-7. ✅ 100% 실제 KB 앵커 (가짜 앵커 0개)
+4. ✅ 명확한 긴장축
+5. ✅ 완성된 1p 제안서 (12/12 섹션)
+6. ⚠️ 강력한 고유문장 (생성됨, 추출 실패)
+7. ⚠️ 실제 KB 앵커 (가짜 3개)
 
 ### 1.6 Fusion Helper
 

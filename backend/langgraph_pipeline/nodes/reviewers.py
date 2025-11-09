@@ -5,11 +5,30 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from backend.langgraph_pipeline.state import OnePagerState
 from backend.tools.kb_search import create_kb_search_tool
 from backend.langgraph_pipeline.utils import agent_node
+from backend.core.models_config import models_config
+from backend.services.kb_service import kb_service
+from pydantic import BaseModel, Field
 from typing import Dict, Any
 import functools
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class DomainReview(BaseModel):
+    """도메인 리뷰 구조화 출력"""
+    advantages: str = Field(
+        ..., 
+        description="이 책의 [구체적 내용]은 앵커 관점에서... (2-3문장, 반드시 책의 구체적 사례 명시, 앵커 포함)"
+    )
+    problems: str = Field(
+        ..., 
+        description="하지만 이 책의 [특정 부분]은... (2-3문장, 구체적 문제점, 앵커 포함)"
+    )
+    conditions: str = Field(
+        ..., 
+        description="이 책의 아이디어가 성공하려면... (2-3문장, 실행 조건, 앵커 포함)"
+    )
 
 # KB 검색 도구
 kb_search_tool = create_kb_search_tool()
@@ -69,15 +88,6 @@ def review_domain_node(state: OnePagerState, domain: str = None) -> Dict[str, An
     
     logger.info(f"[START] Reviewer_{domain}")
     
-    # LLM 및 Agent 생성
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
-    
-    # Agent 생성 (system prompt는 user message에 포함)
-    agent = create_react_agent(
-        llm,
-        tools=[kb_search_tool]
-    )
-    
     # 입력 준비
     anchor_id = state.get("anchors", {}).get(domain, "")
     book_ids = state.get("book_ids", [])
@@ -91,10 +101,12 @@ def review_domain_node(state: OnePagerState, domain: str = None) -> Dict[str, An
     # 단일 책 요약 직접 사용
     book_summary = state.get("book_summary", "")
     book_title = state.get("book_title", f"Book {book_id}")
+    book_topic = state.get("book_topic", "주제 없음")
     
     # 디버그 로그
     logger.info(f"[DEBUG] Reviewer_{domain} received:")
     logger.info(f"  Book: {book_title}")
+    logger.info(f"  Topic: {book_topic}")
     logger.info(f"  Summary length: {len(book_summary)} chars")
     logger.info(f"  Summary preview: {book_summary[:150]}...")
     
@@ -102,34 +114,70 @@ def review_domain_node(state: OnePagerState, domain: str = None) -> Dict[str, An
         logger.error(f"[FAIL] Reviewer_{domain}: No book summary!")
         return {"error_message": f"[{domain}] No book summary provided"}
     
-    user_message = f"""{create_reviewer_prompt(domain)}
+    # KB 추가 검색 (책 요약 기반)
+    additional_kb = kb_service.search(book_summary, domain=domain, top_k=3)
+    additional_insights = "\n".join([
+        f"- [{kb.item.anchor_id}] {kb.item.content[:100]}..."
+        for kb in additional_kb
+    ])
+    
+    # Structured LLM 생성
+    llm = ChatOpenAI(model=models_config.REVIEWER_MODEL, temperature=models_config.REVIEWER_TEMP)
+    structured_llm = llm.with_structured_output(DomainReview)
+    
+    system_prompt = f"""{create_reviewer_prompt(domain)}
+
+**중요 규칙:**
+1. 반드시 "이 책의 [구체적 내용]은..." 형식으로 시작
+2. 모든 문장에 [anchor_id] 포함
+3. 일반론 금지, 책의 구체적 사례만 사용"""
+    
+    user_prompt = f"""**할당된 {domain} 앵커 (평가 기준):**
+{anchor_id}
+
+**분석 대상 (출발지식):**
+제목: {book_title}
+주제: {book_topic}
+
+핵심 내용:
+{book_summary}
+
+**추가 참조 가능 KB:**
+{additional_insights}
 
 ---
 
-도서 요약:
-{book_summary}
-
-할당된 앵커: {anchor_id}
-
-위 앵커를 기반으로 {domain} 관점에서 장점, 문제, 조건을 분석하세요.
-kb_search 도구를 사용하여 관련 KB 인사이트를 찾아 활용하세요."""
+위 책을 할당된 앵커 관점에서 평가하여 advantages, problems, conditions를 작성하세요.
+반드시 "이 책의 [구체적 부분]은..." 형식으로 시작하고, 모든 문장에 [anchor_id]를 포함하세요."""
     
-    # Agent 실행
+    # Structured output 실행
     try:
-        response = agent.invoke({
-            "messages": [HumanMessage(content=user_message)]
-        })
+        response = structured_llm.invoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt)
+        ])
         
-        review_content = response["messages"][-1].content
+        # 토큰 사용량 로깅
+        usage = response.__dict__.get('response_metadata', {}).get('usage', {})
+        logger.info(f"[TOKEN] Reviewer_{domain}: "
+                   f"model={models_config.REVIEWER_MODEL}, "
+                   f"input={usage.get('prompt_tokens', 0)}, "
+                   f"output={usage.get('completion_tokens', 0)}, "
+                   f"total={usage.get('total_tokens', 0)}")
         
-        # 리뷰 결과 파싱 (간단한 구현)
+        # 구조화된 출력 확인
+        logger.info(f"[STRUCTURED] Reviewer_{domain}:")
+        logger.info(f"  장점 (first 150 chars): {response.advantages[:150]}...")
+        logger.info(f"  문제 (first 150 chars): {response.problems[:150]}...")
+        logger.info(f"  조건 (first 150 chars): {response.conditions[:150]}...")
+        
         review = {
             "domain": domain,
             "anchor_id": anchor_id,
-            "advantages": extract_section(review_content, "장점"),
-            "problems": extract_section(review_content, "문제"),
-            "conditions": extract_section(review_content, "조건"),
-            "raw_content": review_content
+            "advantages": response.advantages,
+            "problems": response.problems,
+            "conditions": response.conditions,
+            "raw_content": f"장점: {response.advantages}\n\n문제: {response.problems}\n\n조건: {response.conditions}"
         }
         
         logger.info(f"[DONE] Reviewer_{domain}")
@@ -138,7 +186,7 @@ kb_search 도구를 사용하여 관련 KB 인사이트를 찾아 활용하세�
             "reviews": [review],
             "messages": [
                 HumanMessage(
-                    content=f"[{domain}] Review completed\n{review_content[:200]}...",
+                    content=f"[{domain}] Review completed",
                     name=f"Reviewer_{domain}"
                 )
             ]
@@ -154,29 +202,6 @@ kb_search 도구를 사용하여 관련 KB 인사이트를 찾아 활용하세�
             }],
             "error_message": f"Reviewer_{domain} failed: {str(e)}"
         }
-
-
-def extract_section(text: str, section_name: str) -> str:
-    """
-    리뷰 텍스트에서 특정 섹션 추출
-    
-    Args:
-        text: 리뷰 전체 텍스트
-        section_name: 섹션 이름 (장점/문제/조건)
-    
-    Returns:
-        해당 섹션 내용
-    """
-    import re
-    
-    # **장점**: 내용 형식 찾기
-    pattern = rf'\*\*{section_name}\*\*[:\s]*(.+?)(?=\*\*|$)'
-    match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
-    
-    if match:
-        return match.group(1).strip()
-    
-    return f"{section_name} 내용 추출 실패"
 
 
 # functools.partial로 각 도메인별 노드 생성

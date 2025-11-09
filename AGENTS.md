@@ -83,16 +83,47 @@ git status | Select-String -NotMatch "node_modules"
 
 **PowerShell은 이모지 미지원 → 텍스트 사용**
 
+#### 문제 상황
+```powershell
+python test.py
+# UnicodeEncodeError: 'cp949' codec can't encode character '\U0001f680'
+```
+
+#### 해결 방법 1: Python 코드에서 이모지 제거
+
 ```python
 # ❌ 이모지 사용 금지
 print("✓ Test passed")
 print("✅ Success")
+print("🚀 Starting...")
+print("📊 Report")
 
 # ✅ 텍스트 사용
 print("[OK] Test passed")
 print("[PASS] Success")
-print("[FAIL] Failed")
+print("[START] Starting...")
+print("[REPORT] Report")
 ```
+
+#### 해결 방법 2: Python에서 UTF-8 강제 출력
+
+```python
+import sys
+import io
+
+# 스크립트 맨 위에 추가 (import 전)
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+# 이후 이모지 출력 가능 (권장하지 않음)
+print("✅ Success")
+```
+
+#### 권장 사항
+- **모든 Python 스크립트에서 이모지 사용 금지**
+- **로그 출력은 `[OK]`, `[FAIL]`, `[WARN]` 같은 태그 사용**
+- **테스트 결과는 텍스트로 표현** (`PASS`/`FAIL`)
+- **파일명에도 이모지 사용 금지**
 
 ---
 

@@ -4,6 +4,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.langgraph_pipeline.state import OnePagerState
 from backend.services.kb_service import kb_service
+from backend.core.models_config import models_config
 from typing import Dict, Any
 import logging
 
@@ -120,7 +121,7 @@ def analyze_anchors(anchor_details: list[Dict], book_summary: str) -> str:
     Returns:
         분석 결과 (합치/상충/누락/경계)
     """
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(model=models_config.ANCHOR_MAPPER_MODEL, temperature=models_config.ANCHOR_MAPPER_TEMP)
 
     # 앵커 내용 요약
     anchor_summary = "\n".join(
@@ -152,6 +153,15 @@ def analyze_anchors(anchor_details: list[Dict], book_summary: str) -> str:
 
     try:
         response = llm.invoke(messages)
+        
+        # 토큰 사용량 로깅 (로그 파일만)
+        usage = response.response_metadata.get('usage', {})
+        logger.info(f"[TOKEN] AnchorMapper: "
+                   f"model={models_config.ANCHOR_MAPPER_MODEL}, "
+                   f"input={usage.get('prompt_tokens', 0)}, "
+                   f"output={usage.get('completion_tokens', 0)}, "
+                   f"total={usage.get('total_tokens', 0)}")
+        
         return response.content
     except Exception as e:
         logger.error(f"[FAIL] Anchor analysis error: {e}")

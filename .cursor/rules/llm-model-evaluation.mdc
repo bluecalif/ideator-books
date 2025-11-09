@@ -1,0 +1,321 @@
+# LLM Model Evaluation Guidelines
+
+## Overview
+Guidelines for evaluating and selecting LLM models for the LangGraph pipeline. Based on real-world testing experience with gpt-4o-mini, gpt-4.1-mini, gpt-5-nano, and gpt-5-mini, this document provides criteria and best practices for model selection.
+
+## Domain Knowledge
+
+### Model Characteristics
+
+**GPT-4 Series**:
+- `gpt-4o-mini`: Cost-effective, stable, supports temperature control
+- `gpt-4o`: Most capable, higher cost
+- `gpt-4.1-mini`: Improved version, excellent for structured tasks
+- `gpt-4.1-nano`: Fastest, minimal features
+
+**GPT-5 Series**:
+- `gpt-5-nano`: Fast but unreliable, generates fake anchors
+- `gpt-5-mini`: Better than nano, but temperature=1 only
+- `gpt-5`: Base model, temperature=1 only
+- `gpt-5-pro`: Most capable GPT-5 variant
+
+## Evaluation Criteria
+
+### Critical Quality Metrics
+
+| Metric | Target | Description |
+|--------|--------|-------------|
+| **anchored_by** | 100% | All sentences must include KB anchors |
+| **Fake anchors** | 0 | Must not generate non-existent anchor IDs |
+| **Structure compliance** | 12/12 | All required sections present |
+| **Unique sentences** | 3+ | Distinctive insights unique to the book |
+| **External frameworks** | 0 | No SWOT, Porter's 5 Forces, etc. |
+
+### Secondary Metrics
+
+| Metric | Importance | Notes |
+|--------|-----------|-------|
+| Token usage info | Medium | For cost tracking and optimization |
+| Temperature support | Medium | For output consistency control |
+| Speed | Low | Quality over speed |
+| Output length | Low | Content quality matters more |
+
+## Testing Patterns
+
+### Standard Test Protocol
+
+1. **Load KB and Books**
+   - Verify 144 KB items loaded (16 integrated knowledge)
+   - Load test book from CSV
+
+2. **Run Pipeline**
+   - Execute full LangGraph pipeline
+   - Log each node execution
+   - Capture output and validation results
+
+3. **Validate Output**
+   - Check anchored_by percentage
+   - Detect fake anchors
+   - Verify structure (12 sections)
+   - Extract unique sentences
+
+4. **Compare Results**
+   - Generate comparison report
+   - Save outputs with model name in filename
+   - Compare against exemplar (docs/1p사례.md)
+
+### Test File Naming
+```
+1p_{model_name}_{timestamp}.md
+test_{model_name}_{timestamp}.log
+```
+
+## Model Comparison: Usage and Syntax
+
+### gpt-4o-mini
+
+**Temperature**: ✅ Full support (0.0 ~ 2.0)
+```python
+ChatOpenAI(model="gpt-4o-mini", temperature=0.3)  # OK
+```
+
+**Token Usage**: ✅ Available
+```python
+response = llm.invoke(messages)
+usage = response.response_metadata.get('usage', {})
+# Returns: {'prompt_tokens': 1234, 'completion_tokens': 567, 'total_tokens': 1801}
+```
+
+**Structured Output**: ✅ Supported
+```python
+llm.with_structured_output(IntegrationResult)  # OK
+```
+
+**Characteristics**:
+- Stable and cost-effective
+- Good baseline performance
+- May have lower anchored_by rate (70-80%)
+
+---
+
+### gpt-4.1-mini
+
+**Temperature**: ✅ Full support (0.0 ~ 2.0)
+```python
+ChatOpenAI(model="gpt-4.1-mini", temperature=0.0)  # OK
+ChatOpenAI(model="gpt-4.1-mini", temperature=0.7)  # OK
+```
+
+**Token Usage**: ❌ Not available
+```python
+response = llm.invoke(messages)
+usage = response.response_metadata.get('usage', {})
+# Returns: {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+# Workaround: Estimate by character count (4 chars ≈ 1 token)
+```
+
+**Structured Output**: ✅ Supported
+```python
+llm.with_structured_output(IntegrationResult)  # OK
+```
+
+**Characteristics**:
+- Excellent anchored_by rate (100%)
+- Zero fake anchors
+- Best for structured tasks
+- **Recommended for production**
+
+---
+
+### gpt-5-nano
+
+**Temperature**: ❌ Fixed at 1.0 only
+```python
+# ❌ Error
+ChatOpenAI(model="gpt-5-nano", temperature=0.3)
+# Error: "temperature does not support 0.3. Only the default (1) value is supported"
+
+# ✅ Must use 1.0
+ChatOpenAI(model="gpt-5-nano", temperature=1.0)
+```
+
+**Token Usage**: ❌ Not available
+```python
+usage = response.response_metadata.get('usage', {})
+# Returns: {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+```
+
+**Structured Output**: ⚠️ Unreliable
+- May produce empty or malformed structured data
+
+**Critical Issues**:
+- ❌ Generates fake anchors (e.g., `투자전략_최적화_001`)
+- ❌ Ignores "use only these anchors" instructions
+- ❌ Cannot be trusted for KB-based systems
+- **Not recommended**
+
+---
+
+### gpt-5-mini
+
+**Temperature**: ❌ Fixed at 1.0 only
+```python
+# ❌ Error with custom temperature
+ChatOpenAI(model="gpt-5-mini", temperature=0.5)
+# Error: "temperature does not support 0.5. Only the default (1) value is supported"
+
+# ✅ Must use 1.0
+ChatOpenAI(model="gpt-5-mini", temperature=1.0)
+```
+
+**Token Usage**: ❌ Not available
+
+**Structured Output**: ⚠️ Partial support
+- Works but may miss sections
+
+**Characteristics**:
+- Lower anchored_by rate (75-80%)
+- Structure compliance issues
+- Temperature=1 means high variability
+- **Not recommended for production**
+
+---
+
+### gpt-4o
+
+**Temperature**: ✅ Full support
+```python
+ChatOpenAI(model="gpt-4o", temperature=0.3)  # OK
+```
+
+**Token Usage**: ✅ Available
+
+**Structured Output**: ✅ Supported
+
+**Characteristics**:
+- Highest quality
+- Higher cost (15x vs gpt-4o-mini)
+- Use for critical quality requirements
+
+---
+
+## Model Compatibility Matrix
+
+| Feature | gpt-4o-mini | gpt-4.1-mini | gpt-5-nano | gpt-5-mini | gpt-4o |
+|---------|-------------|--------------|------------|------------|--------|
+| **Temperature Control** | 0.0-2.0 | 0.0-2.0 | 1.0 only | 1.0 only | 0.0-2.0 |
+| **Token Usage Info** | ✅ | ❌ | ❌ | ❌ | ✅ |
+| **Structured Output** | ✅ | ✅ | ⚠️ | ⚠️ | ✅ |
+| **Fake Anchor Risk** | Low | None | High | Medium | Low |
+| **Prompt Following** | Good | Excellent | Poor | Fair | Excellent |
+| **Cost** | Low | Low | Lowest | Low | High |
+
+## Model Selection Checklist
+
+### Before Choosing a Model
+- [ ] Test with actual project data (not synthetic)
+- [ ] Verify anchored_by ≥ 95%
+- [ ] Check for fake anchor generation
+- [ ] Validate temperature support if needed
+- [ ] Confirm token usage info availability
+- [ ] Test structured output (Pydantic models)
+
+### Red Flags (Immediate Disqualification)
+- ❌ Generates fake anchors (any occurrence)
+- ❌ anchored_by < 90%
+- ❌ Cannot follow structured output format
+- ❌ Ignores critical prompt instructions
+
+### Yellow Flags (Monitor Closely)
+- ⚠️ Token usage info unavailable
+- ⚠️ Temperature control limited
+- ⚠️ Output length significantly shorter
+- ⚠️ Generic responses (not book-specific)
+
+## Configuration Pattern
+
+### Centralized Model Config
+
+**File**: `backend/core/models_config.py`
+
+```python
+class ModelsConfig:
+    """노드별 LLM 모델 설정"""
+    
+    # 노드별 모델 (독립 설정 가능)
+    ANCHOR_MAPPER_MODEL = "gpt-4.1-mini"
+    REVIEWER_MODEL = "gpt-4.1-mini"
+    INTEGRATOR_MODEL = "gpt-4.1-mini"
+    PRODUCER_MODEL = "gpt-4.1-mini"
+    
+    # Temperature 설정
+    ANCHOR_MAPPER_TEMP = 0.0  # Deterministic
+    REVIEWER_TEMP = 0.3       # Low creativity
+    INTEGRATOR_TEMP = 0.5     # Balanced
+    PRODUCER_TEMP = 0.7       # Higher creativity
+```
+
+### Node Usage
+
+```python
+from backend.core.models_config import models_config
+
+llm = ChatOpenAI(
+    model=models_config.REVIEWER_MODEL,
+    temperature=models_config.REVIEWER_TEMP
+)
+```
+
+## Model Selection Strategy
+
+### Evaluation Priority
+
+1. **Critical**: Zero fake anchors, anchored_by ≥ 95%
+2. **Important**: Structured output support, temperature control
+3. **Nice to have**: Token usage info, speed
+
+### Recommended Models by Use Case
+
+**For Production (Reliability)**:
+- `gpt-4.1-mini`: Balanced cost/quality, excellent for structured tasks
+- `gpt-4o`: Higher quality, higher cost
+
+**For Development/Testing**:
+- `gpt-4o-mini`: Cost-effective baseline
+- `gpt-4.1-mini`: Current recommended default
+
+**Avoid**:
+- `gpt-5-nano`: Generates fake anchors
+- GPT-5 series without testing: Limited temperature control
+
+## Checklist
+
+### Model Evaluation
+- [ ] Run test with actual book data
+- [ ] Check output files for quality
+- [ ] Verify no fake anchors generated
+- [ ] Confirm book content is reflected (not just anchor descriptions)
+- [ ] Compare tension axes clarity
+- [ ] Review log files for errors
+- [ ] Calculate achievement rate (x/6 criteria)
+
+### Model Switching
+- [ ] Update models_config.py
+- [ ] Adjust temperature if needed (check model support)
+- [ ] Run comparison test
+- [ ] Document results in comparison report
+- [ ] Keep old output files for reference
+
+### Production Deployment
+- [ ] Choose model with 0 fake anchors
+- [ ] Ensure anchored_by ≥ 95%
+- [ ] Verify temperature support for consistency
+- [ ] Document model choice in TODOs.md
+- [ ] Update .env.example with model settings
+
+## References
+- Model comparison: `backend/tests/output/model_comparison_report.md`
+- Test results: `backend/tests/output/1p_{model_name}_*.md`
+- Test logs: `backend/tests/output/test_{model_name}_*.log`
+- Project goals: `docs/프로젝트본질.md`
+- Exemplar: `docs/1p사례.md`

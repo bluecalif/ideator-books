@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str = Field(..., alias="OPENAI_API_KEY")
     
+    # LLM Models (노드별 독립 설정 가능)
+    anchor_mapper_model: str = Field(default="gpt-4o-mini", alias="ANCHOR_MAPPER_MODEL")
+    reviewer_model: str = Field(default="gpt-4o-mini", alias="REVIEWER_MODEL")
+    integrator_model: str = Field(default="gpt-4o-mini", alias="INTEGRATOR_MODEL")
+    producer_model: str = Field(default="gpt-4o-mini", alias="PRODUCER_MODEL")
+    
     # Application
     pythonpath: str = Field(default="", alias="PYTHONPATH")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

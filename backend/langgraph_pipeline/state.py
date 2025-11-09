@@ -17,6 +17,7 @@ class OnePagerState(TypedDict):
     book_ids: List[str]  # 선택된 도서 ID 목록 (1권만 처리)
     book_summary: Optional[str]  # 단일 책 요약
     book_title: Optional[str]  # 책 제목
+    book_author: Optional[str]  # 저자
     book_topic: Optional[str]  # 주제
     mode: str  # "reduce" or "simple_merge"
     format: str  # "content" or "service"
@@ -64,6 +65,7 @@ def create_initial_state(
     remind_enabled: bool = False,
     book_summary: Optional[str] = None,
     book_title: Optional[str] = None,
+    book_author: Optional[str] = None,
     book_topic: Optional[str] = None
 ) -> OnePagerState:
     """초기 State 생성"""
@@ -72,6 +74,7 @@ def create_initial_state(
         book_ids=book_ids,
         book_summary=book_summary,
         book_title=book_title,
+        book_author=book_author,
         book_topic=book_topic,
         mode=mode,
         format=format,

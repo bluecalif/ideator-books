@@ -223,8 +223,8 @@ class KBService:
             scored_candidates = []
             for idx, score in enumerate(similarities):
                 item = candidates[idx]
-                # 통합지식이면 점수에 0.2 가중치 추가 (우선순위 향상)
-                adjusted_score = score + (0.2 if item.is_integrated_knowledge else 0.0)
+                # 통합지식이면 점수에 0.05 가중치 추가 (우선순위 향상)
+                adjusted_score = score + (0.05 if item.is_integrated_knowledge else 0.0)
                 scored_candidates.append((idx, adjusted_score, score))  # (idx, adjusted, original)
             
             # adjusted_score 기준으로 정렬
