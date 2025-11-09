@@ -32,10 +32,14 @@ def producer_node(state: OnePagerState) -> Dict[str, Any]:
     reviews = state.get("reviews", [])
     integration_result = state.get("integration_result", "")
     tension_axes = state.get("tension_axes", [])
+    available_anchors = state.get("available_anchors", [])
 
     if not reviews or not integration_result:
         logger.error("[FAIL] Missing reviews or integration result")
         return {"error_message": "Producer requires reviews and integration result"}
+    
+    if not available_anchors:
+        logger.warning("[WARN] No available_anchors provided - fake anchor prevention may not work")
 
     # 1p 생성
     onepager_md = generate_onepager_md(
@@ -44,6 +48,7 @@ def producer_node(state: OnePagerState) -> Dict[str, Any]:
         tension_axes=tension_axes,
         mode=mode,
         format_type=format_type,
+        available_anchors=available_anchors,
     )
 
     # 고유문장 추출
@@ -71,9 +76,10 @@ def generate_onepager_md(
     tension_axes: Optional[list[str]],
     mode: str,
     format_type: str,
+    available_anchors: list[str],
 ) -> str:
     """
-    1p Markdown 생성
+    1p Markdown 생성 (품질 개선 버전: 1p 제안서 7요소 구조)
 
     Args:
         reviews: 4개 도메인 리뷰
@@ -81,6 +87,7 @@ def generate_onepager_md(
         tension_axes: 긴장축 (Reduce 모드)
         mode: reduce or simple_merge
         format_type: content or service
+        available_anchors: 사용 가능한 KB 앵커 리스트
 
     Returns:
         Markdown 텍스트
@@ -89,18 +96,62 @@ def generate_onepager_md(
 
     system_prompt = f"""당신은 전문가 수준의 1-pager를 작성하는 전문가입니다.
 
-**중요 규칙:**
-1. 모든 문장에 반드시 [anchor_id]를 포함하세요
-2. 최소 3개의 고유문장(새롭고 독창적인 통찰)을 포함하세요
-3. 외부 프레임워크 언급 금지 (KB 기반만 사용)
-4. 형식: {format_type} (콘텐츠형 vs 서비스형)
+**필수 구조 (docs/1p사례.md 기준):**
 
-**구조:**
-1. 머리말 (형식 분기 사유 1줄)
-2. 4개 도메인 리뷰 카드
-3. 통합 기록 ({mode} 모드)
-4. 아이디어 2-3개
-5. 고유문장 3개 (독창적 통찰)
+# 형식 분기
+**{format_type}형** — 구체적이고 설득력 있는 선정 사유 1줄
+
+# 도메인 리뷰 카드
+## 1) [도메인] — 상위 앵커: *[통합지식 anchor]*
+* **장점**: ... (anchored_by: [통합지식 anchor])
+* **문제**: ... (anchored_by: [anchor])
+* **조건**: ... (anchored_by: [anchor])
+
+(4개 도메인 반복)
+
+# 통합 기록 (긴장 축)
+1. **극A** × **극B** (상충/경계/대립)
+2. ...
+
+> **결론 1줄**: 핵심을 관통하는 문장
+
+# 최종 1p 제안서 ({format_type} 판)
+
+## 제목
+**〈구체적이고 매력적인 제목〉**
+
+## 로그라인
+"핵심 메시지를 1-2문장으로..."
+
+## 대상
+구체적인 타겟 독자/시청자
+
+## 핵심 약속(Core Promise)
+* 독자/시청자에게 제공할 구체적 가치
+* 모든 주장은 KB 앵커로 뒷받침
+
+## 포맷
+매체 형식 (매거진 기사, 영상, 책 등)
+
+## 구성(섹션/시퀀스)
+1. 섹션1: ... (anchored_by: [anchor])
+2. 섹션2: ... (anchored_by: [anchor])
+(구체적 구성안)
+
+## 고유 문장(3) — "이 책 아니면 안 나오는 문장"
+1. **"강력하고 인상적인 문장..."** (anchored_by: [anchor])
+2. **"독창적이고 기억에 남는 문장..."** (anchored_by: [anchor])
+3. **"핵심을 관통하는 문장..."** (anchored_by: [anchor])
+
+## CTA
+"독자를 행동으로 이끄는 문장"
+
+**중요 규칙:**
+1. 모든 문장에 [anchor_id] 포함
+2. **가짜 앵커 생성 절대 금지** → 제공된 KB 앵커만 사용
+3. 통합지식 앵커 필수 사용
+4. 일반론 금지, 책의 구체적 내용 반영
+5. 외부 프레임워크 언급 금지
 
 **출력 형식:** Markdown"""
 
@@ -115,14 +166,27 @@ def generate_onepager_md(
         ]
     )
 
+    # 사용 가능한 앵커 리스트 (처음 50개만 예시로 제공)
+    anchor_list = "\n".join([f"- {a}" for a in available_anchors[:50]])
+    if len(available_anchors) > 50:
+        anchor_list += f"\n... 외 {len(available_anchors) - 50}개 더"
+    
     user_prompt = f"""4개 도메인 리뷰:
 {review_summary}
 
 통합 결과:
 {integration_result}
 
-위 내용을 바탕으로 {format_type} 형식의 1-pager를 작성하세요.
-모든 문장에 [anchor_id]를 포함하고, 최소 3개의 고유문장을 만드세요."""
+**사용 가능한 KB 앵커 (이것만 사용!):**
+{anchor_list}
+
+**경고**: 위 목록에 없는 앵커를 절대 생성하지 마세요! 
+예를 들어 "투자전략_최적화_001" 같은 가짜 앵커는 절대 금지입니다.
+반드시 위 리스트에 있는 앵커만 사용하세요.
+
+위 내용을 바탕으로 {format_type} 형식의 완전한 1p 제안서를 작성하세요.
+7요소 구조(제목/로그라인/대상/약속/포맷/구성/CTA)를 모두 포함하고,
+모든 문장에 실제 KB [anchor_id]를 포함하세요."""
 
     try:
         response = llm.invoke(

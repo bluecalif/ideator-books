@@ -24,6 +24,7 @@ def validator_node(state: OnePagerState) -> Dict[str, Any]:
     1. anchored_by = 100% (모든 문장이 KB 앵커 포함)
     2. 고유문장 >= 3개
     3. 외부 프레임워크 = 0개
+    4. 가짜 앵커 = 0개 (품질 개선)
     
     Args:
         state: OnePagerState
@@ -35,6 +36,7 @@ def validator_node(state: OnePagerState) -> Dict[str, Any]:
     
     onepager_md = state.get("onepager_md", "")
     unique_sentences = state.get("unique_sentences", [])
+    available_anchors = state.get("available_anchors", [])
     
     if not onepager_md:
         logger.error("[FAIL] No 1p to validate")
@@ -44,7 +46,7 @@ def validator_node(state: OnePagerState) -> Dict[str, Any]:
         }
     
     # 검증 실행
-    validation_results = validate_onepager(onepager_md, unique_sentences)
+    validation_results = validate_onepager(onepager_md, unique_sentences, available_anchors)
     
     # 검증 통과 여부
     passed = validation_results["all_passed"]
@@ -80,13 +82,18 @@ def validator_node(state: OnePagerState) -> Dict[str, Any]:
     }
 
 
-def validate_onepager(onepager_md: str, unique_sentences: list[str]) -> Dict[str, Any]:
+def validate_onepager(
+    onepager_md: str, 
+    unique_sentences: list[str],
+    available_anchors: list[str] = None
+) -> Dict[str, Any]:
     """
-    1p 검증 로직
+    1p 검증 로직 (품질 개선: 가짜 앵커 검증 추가)
     
     Args:
         onepager_md: 1p Markdown 텍스트
         unique_sentences: State에서 추출한 고유문장
+        available_anchors: 사용 가능한 KB 앵커 리스트
     
     Returns:
         검증 결과 딕셔너리
@@ -117,19 +124,22 @@ def validate_onepager(onepager_md: str, unique_sentences: list[str]) -> Dict[str
             f"외부 프레임워크: {external_frame_count}개 발견 (허용: 0개)"
         )
     
-    # 4. 앵커 ID 유효성 검증
-    anchor_ids = extract_anchor_ids(onepager_md)
-    invalid_anchors = validate_anchor_ids(anchor_ids)
+    # 4. 가짜 앵커 검증 (품질 개선)
+    fake_anchor_result = validate_fake_anchors(onepager_md, available_anchors or [])
+    fake_anchor_count = fake_anchor_result["fake_anchor_count"]
     
-    if invalid_anchors:
+    if fake_anchor_count > 0:
+        fake_list = ", ".join(fake_anchor_result["fake_anchors"][:5])
         errors.append(
-            f"유효하지 않은 앵커: {invalid_anchors[:3]}"
+            f"가짜 앵커: {fake_anchor_count}개 발견 ({fake_list}...)"
         )
+        logger.error(f"[FAIL] Fake anchors detected: {fake_anchor_result['fake_anchors']}")
     
     return {
         "anchored_by_percent": anchored_by_percent,
         "unique_sentence_count": unique_sentence_count,
         "external_frame_count": external_frame_count,
+        "fake_anchor_count": fake_anchor_count,
         "all_passed": len(errors) == 0,
         "errors": errors
     }
@@ -177,6 +187,45 @@ def validate_anchor_ids(anchor_ids: list[str]) -> list[str]:
             invalid.append(anchor_id)
     
     return invalid
+
+
+def validate_fake_anchors(onepager_md: str, available_anchors: list[str]) -> Dict[str, Any]:
+    """
+    가짜 앵커 검출 (품질 개선 핵심 기능)
+    
+    Producer가 생성한 앵커 중 실제 KB에 없는 앵커를 찾아냅니다.
+    예: "투자전략_최적화_001" 같은 가짜 앵커
+    
+    Args:
+        onepager_md: 1p Markdown 텍스트
+        available_anchors: 사용 가능한 KB 앵커 리스트
+    
+    Returns:
+        {
+            "fake_anchor_count": int,
+            "fake_anchors": list[str],
+            "fake_anchor_ok": bool
+        }
+    """
+    # 1p 텍스트에서 사용된 모든 앵커 추출
+    used_anchors = extract_anchor_ids(onepager_md)
+    
+    # available_anchors set으로 변환 (빠른 조회)
+    available_set = set(available_anchors)
+    
+    # 가짜 앵커 찾기
+    fake_anchors = [anchor for anchor in used_anchors if anchor not in available_set]
+    
+    # 중복 제거
+    fake_anchors = list(set(fake_anchors))
+    
+    logger.info(f"[CHECK] Fake anchors: {len(fake_anchors)}/{len(used_anchors)}")
+    
+    return {
+        "fake_anchor_count": len(fake_anchors),
+        "fake_anchors": fake_anchors,
+        "fake_anchor_ok": len(fake_anchors) == 0
+    }
 
 
 # Import kb_service

@@ -28,6 +28,7 @@ class OnePagerState(TypedDict):
     # === AnchorMapper 결과 ===
     anchors: Dict[str, str]  # {domain: anchor_id}
     anchor_analysis: Optional[str]  # 합치/상충/누락/경계 분석
+    available_anchors: Optional[List[str]]  # 사용 가능한 모든 KB 앵커 리스트 (가짜 앵커 방지)
     
     # === Reviewer 결과 (누적) ===
     reviews: Annotated[List[Dict], operator.add]  # [{domain, advantages, problems, conditions, anchor_id}]
@@ -85,6 +86,7 @@ def create_initial_state(
         # Optional 필드
         anchors={},
         anchor_analysis=None,
+        available_anchors=None,
         tension_axes=None,
         integration_result=None,
         format_reasoning=None,

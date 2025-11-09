@@ -1,0 +1,212 @@
+# 1-Pager Quality Improvement Standards
+
+## Overview
+Guidelines for improving the quality of AI-generated 1-pager outputs to match expert-level standards. Based on exemplar analysis (docs/1p사례.md), the pipeline must produce outputs with concrete reasoning, integrated knowledge anchors, clear tension axes, and complete proposal structure.
+
+## Domain Knowledge
+
+### Quality Criteria (7 Standards)
+1. **Concrete Format Reasoning**: Specific justification for format choice (tool-based/narrative/analytical)
+2. **Deep Domain Reviews**: Book content deeply connected to KB insights
+3. **Integrated Knowledge Anchors**: Use "통합지식" anchors, not just individual insights
+4. **Clear Tension Axes**: Explicit opposition/conflict/boundary relationships (not generic)
+5. **Complete 1p Proposal**: 7 elements (title/logline/audience/promise/format/structure/CTA)
+6. **Powerful Unique Sentences**: 3 memorable, distinctive insights
+7. **Zero Fake Anchors**: Only use actual KB anchors, never generate new ones
+
+### Exemplar Structure (from docs/1p사례.md)
+```markdown
+# 형식 분기
+**도구형** — 구체적인 선정 사유 1줄
+
+# 도메인 리뷰 카드
+## 1) 인문/자기계발 — 상위 앵커: *통합지식*
+* **장점**: ... (anchored_by: 통합지식)
+* **문제**: ... (anchored_by: 통합지식)
+* **조건**: ... (anchored_by: 통합지식)
+
+# 통합 기록(긴장 축 3개)
+1. **의미 기반 자기개선** × **성과 비교 사회** (상충)
+2. **고통 인정·책임 수용** × **행복 산업의 즉효 솔루션** (상충)
+
+# 최종 1p 제안서
+## 제목 / 로그라인 / 대상 / 핵심 약속 / 포맷 / 구성 / 고유 문장(3) / CTA
+```
+
+## Implementation Patterns
+
+### 1. KB Integrated Knowledge Parsing
+
+**File**: `backend/services/kb_service.py`
+
+**Pattern**: Parse "통합지식" sections from KB markdown files
+```python
+class KBItem:
+    is_integrated_knowledge: bool  # True if from "통합지식" section
+    anchor_id: str  # Format: "{domain}·{subcategory} 통합지식"
+```
+
+**Anchor Format**:
+- Individual: `경제경영·경영/사업_기획의정석_001`
+- Integrated: `경제경영·경영/사업 통합지식`
+
+### 2. Reviewer Prompt Enhancement
+
+**File**: `backend/langgraph_pipeline/nodes/reviewers.py`
+
+**Bad** (current):
+```python
+"주어진 도서 요약과 앵커를 기반으로 장점, 문제, 조건을 분석하세요."
+```
+
+**Good** (target):
+```python
+f"""당신은 {domain} 전문가입니다.
+
+**책의 핵심 메시지를 정확히 파악**하고, KB 검색(통합지식 우선)으로 관련 인사이트를 찾아 **구체적으로 연결**하세요.
+
+출력:
+**장점**: 이 책의 [구체적 내용]은 [통합지식 anchor]와 연결되어... (2-3문장)
+**문제**: 하지만 [책의 특정 부분]은 [anchor] 관점에서 볼 때... (2-3문장)
+**조건**: 성공하려면 [anchor]에서 말하는 [구체적 조건]이... (2-3문장)
+
+**중요:** 통합지식 앵커 1개 이상 필수, 일반론 금지
+"""
+```
+
+### 3. Integrator Tension Axes Improvement
+
+**File**: `backend/langgraph_pipeline/nodes/integrator.py`
+
+**Bad** (generic):
+- "효율성 vs 윤리"
+- "단기 vs 장기"
+
+**Good** (specific):
+```python
+system_prompt = """긴장축 예시:
+- **의미 기반 자기개선** × **성과 비교 사회** (상충)
+- **개인 루틴** × **사회적 노이즈/제약** (경계)
+
+목표:
+1. 2-3개 긴장축 추출
+2. 명확한 대립 관계 (상충/경계/대립)
+3. 일반론 금지 → 책과 KB의 구체적 내용 반영
+"""
+```
+
+### 4. Producer Complete Redesign
+
+**File**: `backend/langgraph_pipeline/nodes/producer.py`
+
+**Current Problem**: Simple structure, no proposal framework
+
+**Target Structure**:
+```python
+system_prompt = f"""필수 구조 (7개 섹션):
+
+# 형식 분기
+**{format_type}형** — 구체적 선정 사유 1줄
+
+# 도메인 리뷰 카드
+(4개 도메인 × 통합지식 앵커 기준)
+
+# 통합 기록 (긴장 축)
+1. **극A** × **극B** (상충/경계/대립)
+
+# 최종 1p 제안서
+## 제목 / 로그라인 / 대상 / 핵심 약속 / 포맷 / 구성 / 고유 문장(3) / CTA
+
+**중요:**
+- 가짜 앵커 생성 절대 금지 → 제공된 KB 앵커만 사용
+- 통합지식 앵커 필수 활용
+"""
+```
+
+### 5. Fake Anchor Prevention
+
+**Strategy**:
+1. State에 `available_anchors: list[str]` 추가
+2. AnchorMapper에서 KB 앵커 리스트 전달
+3. Producer 프롬프트에 명시:
+
+```python
+available_anchors = state.get("available_anchors", [])
+
+user_prompt = f"""
+**사용 가능한 KB 앵커 (이것만 사용):**
+{chr(10).join(available_anchors)}
+
+**경고:** 위 목록에 없는 앵커를 절대 생성하지 마세요!
+"""
+```
+
+### 6. Validator Enhancement
+
+**File**: `backend/langgraph_pipeline/nodes/validator.py`
+
+**Add**:
+```python
+def validate_fake_anchors(onepager_md: str, available_anchors: list[str]) -> dict:
+    """가짜 앵커 검출"""
+    used_anchors = re.findall(r'\[([^\]]+)\]', onepager_md)
+    fake_anchors = [a for a in used_anchors if a not in available_anchors]
+    
+    return {
+        "fake_anchor_count": len(fake_anchors),
+        "fake_anchors": fake_anchors,
+        "fake_anchor_ok": len(fake_anchors) == 0
+    }
+```
+
+## Checklist
+
+### Before Starting Quality Improvement
+- [ ] Read exemplar (docs/1p사례.md) thoroughly
+- [ ] Understand 7 quality criteria
+- [ ] Identify KB "통합지식" sections in 4 domain files
+- [ ] Review current output vs exemplar gaps
+
+### KB Integrated Knowledge
+- [ ] Parse "통합지식" sections from KB files
+- [ ] Add `is_integrated_knowledge` field to KBItem
+- [ ] Format anchor as `{domain}·{subcategory} 통합지식`
+- [ ] Prioritize integrated knowledge in search results
+
+### Reviewer Enhancement
+- [ ] Add "책 내용 구체적으로 파악" instruction
+- [ ] Require "통합지식 앵커 1개 이상 사용"
+- [ ] Output format: 2-3 sentences per section
+- [ ] Ban generic analysis, require specific book-KB connection
+
+### Integrator Enhancement
+- [ ] Add tension axes examples in prompt
+- [ ] Require "명확한 대립/상충/경계" relationship
+- [ ] Ban generic pairs like "효율 vs 윤리"
+- [ ] Synthesis/balance point for each axis
+
+### Producer Redesign
+- [ ] Implement 7-element proposal structure
+- [ ] Pass available_anchors to LLM prompt
+- [ ] Add warning about fake anchors
+- [ ] Require integrated knowledge anchor usage
+- [ ] Generate 3 powerful unique sentences
+
+### Validator Enhancement
+- [ ] Add validate_fake_anchors() function
+- [ ] Check all anchors against available_anchors list
+- [ ] Report fake_anchor_count and list
+- [ ] Fail if fake_anchor_count > 0
+
+### Testing
+- [ ] Test integrated knowledge parsing
+- [ ] Generate 1p and verify 7 criteria
+- [ ] Check fake anchor count = 0
+- [ ] Compare output structure vs exemplar
+- [ ] Validate all anchors exist in KB
+
+## References
+- Exemplar: `docs/1p사례.md`
+- KB files: `docs/지식베이스생성_*.md` (4 domains)
+- Current implementation: `backend/langgraph_pipeline/nodes/`
+- TODOs: Phase 1.5 in `TODOs.md`

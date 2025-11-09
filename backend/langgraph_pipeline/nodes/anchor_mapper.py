@@ -89,12 +89,17 @@ def anchor_mapper_node(state: OnePagerState) -> Dict[str, Any]:
 
     # 앵커 분석 (LLM 사용)
     anchor_analysis = analyze_anchors(anchor_details, book_summary)
+    
+    # 사용 가능한 모든 KB 앵커 리스트 (가짜 앵커 방지용)
+    available_anchors = [item.anchor_id for item in kb_service.all_items]
+    logger.info(f"[OK] Available anchors: {len(available_anchors)} items")
 
     logger.info("[DONE] AnchorMapper")
 
     return {
         "anchors": anchors,
         "anchor_analysis": anchor_analysis,
+        "available_anchors": available_anchors,
         "messages": [
             HumanMessage(
                 content=f"Mapped anchors: {anchors}\nAnalysis: {anchor_analysis}",

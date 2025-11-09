@@ -96,17 +96,26 @@
 - ❌ 고유문장이 약함
 - ❌ 가짜 앵커 생성 (예: `투자전략_최적화_001`)
 
-| ID | 작업 내용 | Status | 비고 |
-|----|----------|--------|------|
-| 1.5.1 | 모범 사례 분석 및 품질 기준 정의 | ⏳ TODO | docs/1p사례.md 참고 |
-| 1.5.2 | KB 통합지식 파싱 및 활용 | ⏳ TODO | "통합지식" 섹션 → 상위 앵커 |
-| 1.5.3 | Producer 프롬프트 개선 (1p 제안서) | ⏳ TODO | 제목/로그라인/대상/포맷/구성/CTA 생성 |
-| 1.5.4 | 고유문장 품질 강화 | ⏳ TODO | 더 강력하고 인상적인 문장 생성 |
-| 1.5.5 | 가짜 앵커 생성 방지 | ⏳ TODO | Producer가 KB 앵커만 사용하도록 |
-| 1.5.6 | Reviewer 프롬프트 강화 | ⏳ TODO | 책 내용을 깊이 있게 분석하도록 |
-| 1.5.7 | Integrator 긴장축 개선 | ⏳ TODO | 더 명확한 대립/경계 관계 |
-| 1.5.8 | ✅ 테스트: 품질 비교 (모범 사례 대비) | ⏳ TODO | 7가지 기준으로 평가 |
-| 1.5.9 | 🔄 Git Commit: "1p 품질 개선 완료" | ⏳ TODO | Producer + Reviewer + Integrator 개선 |
+**모범 사례 (docs/1p사례.md) 핵심 요소:**
+- 구체적 형식 분기 (도구형/이야기형/분석형)
+- 도메인별 **통합지식 앵커** 활용
+- 명확한 긴장축 (의미vs성과, 개인vs사회)
+- 완성된 1p 제안서 (7요소: 제목/로그라인/대상/약속/포맷/구성/CTA)
+- 강력한 고유문장 3개
+- 100% 실제 KB 앵커
+
+| ID | 작업 내용 | Status | 구현 대상 | 비고 |
+|----|----------|--------|----------|------|
+| 1.5.1 | 모범 사례 분석 및 품질 기준 정의 | ✅ DONE | - | docs/1p사례.md 기준 확립, .cursor/rules 생성 |
+| 1.5.2 | KB 통합지식 파싱 및 활용 | ✅ DONE | kb_service.py, schemas.py | "통합지식" 섹션 파싱, is_integrated_knowledge 필드, 우선순위 검색 |
+| 1.5.3 | State에 available_anchors 추가 | ✅ DONE | state.py | 가짜 앵커 방지용 필드 추가 |
+| 1.5.4 | AnchorMapper 앵커 리스트 전달 | ✅ DONE | anchor_mapper.py | 사용 가능한 모든 KB 앵커 State에 저장 |
+| 1.5.5 | Reviewer 프롬프트 강화 | ✅ DONE | reviewers.py | 통합지식 우선, 책 내용과 KB 구체적 연결, 일반론 금지 |
+| 1.5.6 | Integrator 긴장축 개선 | ✅ DONE | integrator.py | 명확한 대립/상충/경계 관계, 모범 예시 포함 |
+| 1.5.7 | Producer 프롬프트 전면 개편 | ✅ DONE | producer.py | 1p 제안서 7요소 구조, 가짜 앵커 방지, available_anchors 전달 |
+| 1.5.8 | Validator 가짜 앵커 검증 추가 | ✅ DONE | validator.py | validate_fake_anchors() 로직, fake_anchor_count 검증 |
+| 1.5.9 | ✅ 테스트: 품질 비교 (모범 사례 대비) | ⏳ TODO | test_integrated_knowledge.py | 통합지식 파싱 테스트 작성, 품질 테스트는 수동 |
+| 1.5.10 | 🔄 Git Commit: "1p 품질 개선 완료" | 🚧 IN PROGRESS | - | 모든 노드 개선 완료 |
 
 **목표 품질 기준 (모범 사례 수준):**
 1. ✅ 구체적인 형식 분기 (도구형/이야기형/분석형)

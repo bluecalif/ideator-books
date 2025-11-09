@@ -12,6 +12,7 @@ class KBItem(BaseModel):
     anchor_id: str = Field(..., description="Anchor ID for referencing")
     content: str = Field(..., description="인사이트 내용")
     is_fusion: bool = Field(default=False, description="융합형 인사이트 여부")
+    is_integrated_knowledge: bool = Field(default=False, description="통합지식 여부")
     reference_books: List[str] = Field(default_factory=list, description="참고 도서 목록")
     
     class Config:

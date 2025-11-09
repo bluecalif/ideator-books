@@ -56,7 +56,7 @@ class KBService:
         return len(items)
     
     def _parse_kb_file(self, file_path: Path, domain: str) -> List[KBItem]:
-        """KB 파일 파싱"""
+        """KB 파일 파싱 (개별 인사이트 + 통합지식)"""
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
@@ -67,15 +67,18 @@ class KBService:
         # 소분류 섹션별로 분할
         lines = content.split('\n')
         
-        for i, line in enumerate(lines):
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            
             # 소분류 헤더 감지: ### **소분류: XXX**
             subcategory_match = re.match(r'###\s+\*\*소분류:\s*(.+?)\*\*', line)
             if subcategory_match:
                 current_subcategory = subcategory_match.group(1).strip()
+                i += 1
                 continue
             
             # 테이블 행 파싱: | 인사이트 내용 | 참고 도서 |
-            # 헤더 행과 구분선은 건너뛰기
             if current_subcategory and line.strip().startswith('|') and not line.strip().startswith('| :'):
                 parts = [p.strip() for p in line.split('|')]
                 
@@ -86,6 +89,7 @@ class KBService:
                     
                     # 헤더 행 건너뛰기
                     if '핵심 인사이트' in insight_text or '참고 도서' in books_text:
+                        i += 1
                         continue
                     
                     # 융합형 플래그 감지
@@ -107,10 +111,51 @@ class KBService:
                         anchor_id=anchor_id,
                         content=insight_text,
                         is_fusion=is_fusion,
+                        is_integrated_knowledge=False,
                         reference_books=reference_books
                     )
                     items.append(item)
                     kb_index += 1
+            
+            # 통합지식 섹션 감지: **통합 지식** 또는 **통합지식**
+            elif current_subcategory and re.match(r'\*\*통합\s*지식\*\*', line):
+                # 다음 줄부터 통합지식 내용 수집
+                integrated_content_lines = []
+                i += 1
+                
+                while i < len(lines):
+                    next_line = lines[i]
+                    # 다음 소분류 섹션이 시작되면 중단
+                    if re.match(r'###\s+\*\*소분류:', next_line):
+                        break
+                    # 내용 수집 (빈 줄 제외)
+                    if next_line.strip():
+                        integrated_content_lines.append(next_line.strip())
+                    i += 1
+                
+                # 통합지식 내용이 있으면 KBItem 생성
+                if integrated_content_lines:
+                    integrated_content = ' '.join(integrated_content_lines)
+                    
+                    # 통합지식 anchor_id: {domain}·{subcategory} 통합지식
+                    anchor_id = f"{domain}·{current_subcategory} 통합지식"
+                    
+                    item = KBItem(
+                        kb_id=f"kb_{domain}_integrated_{current_subcategory}",
+                        domain=domain,
+                        subcategory=current_subcategory,
+                        anchor_id=anchor_id,
+                        content=integrated_content,
+                        is_fusion=False,
+                        is_integrated_knowledge=True,
+                        reference_books=[]  # 통합지식은 참고 도서 없음
+                    )
+                    items.append(item)
+                    logger.info(f"[OK] Parsed integrated knowledge: {anchor_id}")
+                
+                continue
+            
+            i += 1
         
         return items
     
@@ -130,7 +175,8 @@ class KBService:
         query: str,
         domain: Optional[str] = None,
         top_k: int = 5,
-        min_score: float = 0.0
+        min_score: float = 0.0,
+        prioritize_integrated: bool = True
     ) -> List[KBSearchResult]:
         """
         KB 검색 (TF-IDF 유사도 기반)
@@ -140,9 +186,10 @@ class KBService:
             domain: 도메인 필터 (선택)
             top_k: 반환할 결과 개수
             min_score: 최소 유사도 점수
+            prioritize_integrated: 통합지식 우선 반환 여부
         
         Returns:
-            검색 결과 리스트
+            검색 결과 리스트 (통합지식 우선)
         """
         # 도메인 필터링
         candidates = self.all_items
@@ -170,17 +217,39 @@ class KBService:
         # 유사도 계산
         similarities = cosine_similarity(query_vector, candidate_matrix)[0]
         
-        # 상위 k개 선택
-        top_indices = np.argsort(similarities)[-top_k:][::-1]
-        
-        results = []
-        for idx in top_indices:
-            score = float(similarities[idx])
-            if score >= min_score:
-                results.append(KBSearchResult(
-                    item=candidates[idx],
-                    similarity_score=score
-                ))
+        # 통합지식 우선 정렬
+        if prioritize_integrated:
+            # (is_integrated_knowledge, similarity) 튜플로 정렬
+            scored_candidates = []
+            for idx, score in enumerate(similarities):
+                item = candidates[idx]
+                # 통합지식이면 점수에 0.2 가중치 추가 (우선순위 향상)
+                adjusted_score = score + (0.2 if item.is_integrated_knowledge else 0.0)
+                scored_candidates.append((idx, adjusted_score, score))  # (idx, adjusted, original)
+            
+            # adjusted_score 기준으로 정렬
+            scored_candidates.sort(key=lambda x: x[1], reverse=True)
+            top_candidates = scored_candidates[:top_k]
+            
+            results = []
+            for idx, adjusted_score, original_score in top_candidates:
+                if original_score >= min_score:
+                    results.append(KBSearchResult(
+                        item=candidates[idx],
+                        similarity_score=original_score  # 원래 점수 반환
+                    ))
+        else:
+            # 기존 로직 (유사도만으로 정렬)
+            top_indices = np.argsort(similarities)[-top_k:][::-1]
+            
+            results = []
+            for idx in top_indices:
+                score = float(similarities[idx])
+                if score >= min_score:
+                    results.append(KBSearchResult(
+                        item=candidates[idx],
+                        similarity_score=score
+                    ))
         
         return results
     
