@@ -186,22 +186,22 @@
 | 2.1.3 | Row Level Security (RLS) 설정 | ✅ DONE | auth.uid() 기반 격리, kb_items 공개 읽기 전용 |
 | 2.1.4 | Supabase 마이그레이션 실행 | ✅ DONE | Dashboard 완료 + CLI 연결 완료 |
 | 2.1.5 | ✅ 테스트: 테이블 생성 및 기본 쿼리 | ✅ DONE | 8개 테이블 모두 검증 완료 |
-| 2.1.6 | 🔄 Git Commit: "Supabase 스키마 완료" | 🚧 IN PROGRESS | SQL 파일 + README + 테스트 |
+| 2.1.6 | 🔄 Git Commit: "Supabase 스키마 완료" | ✅ DONE | commit f42c522 (6 files, 808 insertions) |
 
 ### 2.2 API 엔드포인트
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 2.2.0 | Pydantic 모델 확장 (models/schemas.py) | ⏳ TODO | Library, Book, Run, Artifact, Reminder 요청/응답 모델 |
-| 2.2.1 | POST /api/upload (routes/upload.py) | ⏳ TODO | CSV 파싱(pandas) → libraries/books 테이블 생성 |
-| 2.2.2 | GET /api/books (routes/books.py) | ⏳ TODO | 필터링: domain, year_range, topic, library_id |
-| 2.2.3 | POST /api/fusion/preview (routes/fusion.py) | ⏳ TODO | 도서 수 기반 추천(synthesis/simple_merge) + 샘플 제공 |
-| 2.2.4 | POST /api/runs (routes/runs.py) | ⏳ TODO | 1p 생성 요청 + BackgroundTasks 등록 |
-| 2.2.5 | GET /api/runs/{id} (routes/runs.py) | ⏳ TODO | 진행 상태 조회 (status, progress_json) |
-| 2.2.6 | GET /api/artifacts/{id} (routes/artifacts.py) | ⏳ TODO | MD 직접 반환 or PDF URL 리디렉트 |
-| 2.2.7 | POST /api/reminders (routes/reminders.py) | ⏳ TODO | 리마인드 on/off 토글 |
-| 2.2.8 | GET /api/history (routes/history.py) | ⏳ TODO | 히스토리 목록 (runs + artifacts + reminders 조인) |
-| 2.2.9 | Router 등록 (main.py) | ⏳ TODO | 8개 라우터 include_router 추가 |
+| 2.2.0 | Pydantic 모델 확장 (models/schemas.py) | ✅ DONE | 8개 카테고리, 20+ 모델 정의 |
+| 2.2.1 | POST /api/upload (routes/upload.py) | ✅ DONE | CSV 파싱 + bulk insert |
+| 2.2.2 | GET /api/books (routes/books.py) | ✅ DONE | JSONB 필터링 + 페이지네이션 |
+| 2.2.3 | POST /api/fusion/preview (routes/fusion.py) | ✅ DONE | 도서 수 기반 추천 로직 |
+| 2.2.4 | POST /api/runs (routes/runs.py) | ✅ DONE | run 레코드 생성 (백그라운드 작업은 Phase 2.3) |
+| 2.2.5 | GET /api/runs/{id} (routes/runs.py) | ✅ DONE | progress_json 반환 |
+| 2.2.6 | GET /api/artifacts/{id} (routes/artifacts.py) | ✅ DONE | MD 반환 / PDF 리디렉트 |
+| 2.2.7 | POST /api/reminders (routes/reminders.py) | ✅ DONE | 토글 + upsert 로직 |
+| 2.2.8 | GET /api/history (routes/history.py) | ✅ DONE | 3-way 조인 (runs + artifacts + reminders) |
+| 2.2.9 | Router 등록 (main.py) | ✅ DONE | 7개 라우터 등록 완료 |
 | 2.2.10 | ✅ 테스트: API 엔드포인트 (httpx) | ⏳ TODO | tests/test_api_endpoints.py 작성 및 실행 |
 | 2.2.11 | 🔄 Git Commit: "API 엔드포인트 완료" | ⏳ TODO | 8개 엔드포인트 + Pydantic 모델 + 테스트 |
 

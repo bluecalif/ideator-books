@@ -1,6 +1,6 @@
 """Data models and Pydantic schemas"""
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -43,22 +43,155 @@ class KBStats(BaseModel):
     items_by_subcategory: dict[str, int]
 
 
-# Run and Artifact models (for future use)
+# ============================================
+# Library Models
+# ============================================
+
+class LibraryCreate(BaseModel):
+    """Library 생성 요청"""
+    name: str = Field(..., min_length=1, max_length=200)
+
+
+class LibraryResponse(BaseModel):
+    """Library 응답"""
+    id: str
+    user_id: str
+    name: str
+    uploaded_at: datetime
+
+
+# ============================================
+# Book Models
+# ============================================
+
+class BookMetadata(BaseModel):
+    """Book 메타데이터 (JSONB)"""
+    title: str
+    author: str
+    year: int
+    domain: str
+    topic: str
+    summary: str
+
+
+class BookResponse(BaseModel):
+    """Book 응답"""
+    id: str
+    library_id: str
+    meta_json: BookMetadata
+    created_at: datetime
+
+
+class BookFilter(BaseModel):
+    """Book 필터"""
+    domain: Optional[str] = None
+    topic: Optional[str] = None
+    year_min: Optional[int] = None
+    year_max: Optional[int] = None
+    library_id: Optional[str] = None
+
+
+# ============================================
+# Run Models
+# ============================================
+
 class RunCreate(BaseModel):
     """1p 생성 요청"""
-    book_ids: List[str] = Field(..., min_length=1, max_length=10)
-    mode: str = Field(..., pattern="^(reduce|simple_merge)$")
+    book_ids: List[str] = Field(..., min_items=1, max_items=10)
+    mode: str = Field(..., pattern="^(synthesis|simple_merge)$")
     format: str = Field(..., pattern="^(content|service)$")
     remind_enabled: bool = False
 
 
+class RunProgress(BaseModel):
+    """Run 진행 상태"""
+    current_node: Optional[str] = None
+    percent: float = Field(0.0, ge=0.0, le=100.0)
+    timestamp: Optional[datetime] = None
+
+
 class RunResponse(BaseModel):
-    """1p 생성 응답"""
+    """Run 응답"""
     id: str
     user_id: str
     status: str  # pending, running, completed, failed
-    progress: dict
-    params: dict
+    progress_json: RunProgress
+    params_json: Dict[str, Any]
+    error_message: Optional[str] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
+
+
+# ============================================
+# Artifact Models
+# ============================================
+
+class ArtifactResponse(BaseModel):
+    """Artifact 응답"""
+    id: str
+    run_id: str
+    kind: str  # onepager
+    format: str  # md, pdf
+    url: str
+    metadata_json: Dict[str, Any]
+    created_at: datetime
+
+
+# ============================================
+# Reminder Models
+# ============================================
+
+class ReminderToggle(BaseModel):
+    """Reminder on/off 토글"""
+    artifact_id: str
+    active: bool
+
+
+class ReminderResponse(BaseModel):
+    """Reminder 응답"""
+    id: str
+    user_id: str
+    artifact_id: str
+    schedule: Optional[datetime] = None
+    active: bool
+    created_at: datetime
+
+
+# ============================================
+# History Models
+# ============================================
+
+class HistoryResponse(BaseModel):
+    """History 응답 (runs + artifacts + reminders 조인)"""
+    run_id: str
+    status: str
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    artifacts: List[ArtifactResponse]
+    reminder: Optional[ReminderResponse] = None
+    params: Dict[str, Any]
+
+
+# ============================================
+# Fusion Helper Models
+# ============================================
+
+class FusionPreviewRequest(BaseModel):
+    """Fusion Helper 요청"""
+    book_ids: List[str] = Field(..., min_items=1, max_items=10)
+
+
+class FusionModeInfo(BaseModel):
+    """Fusion 모드 정보"""
+    mode: str  # synthesis, simple_merge
+    title: str
+    description: str
+    samples: List[str]
+    recommended: bool = False
+
+
+class FusionPreviewResponse(BaseModel):
+    """Fusion Helper 응답"""
+    recommended_mode: FusionModeInfo
+    alternative_mode: FusionModeInfo
 

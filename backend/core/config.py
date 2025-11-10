@@ -44,7 +44,13 @@ class Settings(BaseSettings):
         return v
     
     class Config:
-        env_file = ".env"
+        # 프로젝트 루트의 .env 파일을 찾기
+        import os
+        from pathlib import Path
+        
+        # backend/core/config.py 기준으로 프로젝트 루트 찾기
+        project_root = Path(__file__).parent.parent.parent
+        env_file = project_root / ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
 

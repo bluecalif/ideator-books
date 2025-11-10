@@ -49,12 +49,16 @@ async def health_check():
     }
 
 
-# TODO: Include routers here
-# from backend.api.routes import upload, books, runs, history
-# app.include_router(upload.router, prefix="/api", tags=["upload"])
-# app.include_router(books.router, prefix="/api", tags=["books"])
-# app.include_router(runs.router, prefix="/api", tags=["runs"])
-# app.include_router(history.router, prefix="/api", tags=["history"])
+# Include API routers
+from backend.api.routes import upload, books, fusion, runs, artifacts, reminders, history
+
+app.include_router(upload.router, prefix="/api", tags=["upload"])
+app.include_router(books.router, prefix="/api", tags=["books"])
+app.include_router(fusion.router, prefix="/api", tags=["fusion"])
+app.include_router(runs.router, prefix="/api", tags=["runs"])
+app.include_router(artifacts.router, prefix="/api", tags=["artifacts"])
+app.include_router(reminders.router, prefix="/api", tags=["reminders"])
+app.include_router(history.router, prefix="/api", tags=["history"])
 
 
 if __name__ == "__main__":
