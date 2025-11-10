@@ -222,11 +222,11 @@
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 2.4.1 | JWT 검증 함수 (core/auth.py) | ⏳ TODO | verify_token() + get_current_user() 구현 |
-| 2.4.2 | 인증 Dependency | ⏳ TODO | require_auth() FastAPI Depends 함수 |
-| 2.4.3 | 엔드포인트 보호 | ⏳ TODO | 모든 API에 user_id = Depends(require_auth) 추가 |
-| 2.4.4 | ✅ 테스트: 인증 플로우 | ⏳ TODO | 401 Unauthorized 응답 확인 |
-| 2.4.5 | 🔄 Git Commit: "Phase 2 완료" | ⏳ TODO | API 레이어 전체 (DB + API + 백그라운드 + 인증) |
+| 2.4.1 | JWT 검증 함수 (core/auth.py) | ✅ DONE | verify_supabase_token + get_current_user (Skeleton) |
+| 2.4.2 | 인증 Dependency | ✅ DONE | require_auth, get_optional_user (비동기 지원) |
+| 2.4.3 | 엔드포인트 보호 | ✅ DONE | books, runs, history에 user_id = Depends(require_auth) 추가 |
+| 2.4.4 | ✅ 테스트: 인증 플로우 | ✅ DONE | E2E 테스트 통과 (인증 헤더 포함) |
+| 2.4.5 | 🔄 Git Commit: "Phase 2 완료" | 🚧 IN PROGRESS | API 레이어 전체 (DB + API + 백그라운드 + 인증) |
 
 ---
 

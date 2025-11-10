@@ -1,6 +1,7 @@
 """Books API"""
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from backend.core.database import get_supabase_admin
+from backend.core.auth import require_auth
 from backend.models.schemas import BookResponse, BookMetadata
 from supabase import Client
 from typing import Optional, List
@@ -20,6 +21,7 @@ async def get_books(
     library_id: Optional[str] = Query(None, description="Library ID 필터"),
     limit: int = Query(100, ge=1, le=1000, description="최대 결과 개수"),
     offset: int = Query(0, ge=0, description="결과 오프셋"),
+    user_id: str = Depends(require_auth),  # 인증 필수
     supabase: Client = Depends(get_supabase_admin)
 ):
     """

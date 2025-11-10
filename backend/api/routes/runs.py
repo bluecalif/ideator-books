@@ -1,6 +1,7 @@
 """Runs API - 1p 생성 작업 관리"""
 from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
 from backend.core.database import get_supabase_admin
+from backend.core.auth import require_auth
 from backend.models.schemas import RunCreate, RunResponse, RunProgress
 from backend.services.run_service import execute_pipeline_async
 from supabase import Client
@@ -17,6 +18,7 @@ router = APIRouter()
 async def create_run(
     run_data: RunCreate,
     background_tasks: BackgroundTasks,
+    user_id: str = Depends(require_auth),  # 인증 필수
     supabase: Client = Depends(get_supabase_admin)
 ):
     """
@@ -40,9 +42,7 @@ async def create_run(
                 detail="일부 도서를 찾을 수 없습니다"
             )
         
-        # 임시 user_id (TODO: Phase 2.4에서 실제 인증 구현)
-        temp_user_id = "00000000-0000-0000-0000-000000000001"
-        
+        # user_id는 require_auth Dependency에서 자동 추출
         # Run 생성
         run_params = {
             "book_ids": run_data.book_ids,
@@ -52,7 +52,7 @@ async def create_run(
         }
         
         run_result = supabase.table("runs").insert({
-            "user_id": temp_user_id,
+            "user_id": user_id,
             "params_json": run_params,
             "status": "pending",
             "progress_json": {

@@ -1,6 +1,7 @@
 """History API - 사용자 생성 이력"""
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from backend.core.database import get_supabase_admin
+from backend.core.auth import require_auth
 from backend.models.schemas import HistoryResponse, ArtifactResponse, ReminderResponse, RunProgress
 from supabase import Client
 from typing import List
@@ -15,6 +16,7 @@ router = APIRouter()
 async def get_history(
     limit: int = Query(20, ge=1, le=100, description="최대 결과 개수"),
     offset: int = Query(0, ge=0, description="결과 오프셋"),
+    user_id: str = Depends(require_auth),  # 인증 필수
     supabase: Client = Depends(get_supabase_admin)
 ):
     """
@@ -27,13 +29,11 @@ async def get_history(
     **참고**: 현재 user_id는 임시 UUID 사용 (Phase 2.4 인증 구현 후 실제 사용자로 변경)
     """
     try:
-        # 임시 user_id (TODO: Phase 2.4에서 실제 인증 구현)
-        temp_user_id = "00000000-0000-0000-0000-000000000001"
-        
+        # user_id는 require_auth Dependency에서 자동 추출
         # Runs 조회 (completed만)
         runs_result = supabase.table("runs") \
             .select("*") \
-            .eq("user_id", temp_user_id) \
+            .eq("user_id", user_id) \
             .eq("status", "completed") \
             .order("created_at", desc=True) \
             .range(offset, offset + limit - 1) \
@@ -72,7 +72,7 @@ async def get_history(
                 first_artifact_id = artifacts[0].id
                 reminder_result = supabase.table("reminders") \
                     .select("*") \
-                    .eq("user_id", temp_user_id) \
+                    .eq("user_id", user_id) \
                     .eq("artifact_id", first_artifact_id) \
                     .execute()
                 

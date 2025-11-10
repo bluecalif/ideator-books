@@ -9,6 +9,12 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "http://localhost:8000"
 
+# 인증 헤더 (테스트용 임시 토큰)
+# Phase 3에서 실제 Supabase Auth 토큰으로 교체
+AUTH_HEADERS = {
+    "Authorization": "Bearer test-token-for-skeleton-auth"
+}
+
 
 def test_health_check():
     """서버 헬스 체크"""
@@ -58,7 +64,7 @@ def test_get_books(library_id: str = None):
     if library_id:
         params["library_id"] = library_id
     
-    response = httpx.get(f"{BASE_URL}/api/books", params=params, timeout=10.0)
+    response = httpx.get(f"{BASE_URL}/api/books", params=params, headers=AUTH_HEADERS, timeout=10.0)
     assert response.status_code == 200
     books = response.json()
     
@@ -103,6 +109,7 @@ def test_create_run(book_ids: list, mode: str = "synthesis"):
             "format": "content",
             "remind_enabled": False
         },
+        headers=AUTH_HEADERS,
         timeout=10.0
     )
     
@@ -155,7 +162,7 @@ def test_get_history():
     """히스토리 조회 테스트"""
     logger.info("[TEST] Getting history...")
     
-    response = httpx.get(f"{BASE_URL}/api/history?limit=5", timeout=10.0)
+    response = httpx.get(f"{BASE_URL}/api/history?limit=5", headers=AUTH_HEADERS, timeout=10.0)
     assert response.status_code == 200
     history = response.json()
     
