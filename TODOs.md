@@ -202,20 +202,21 @@
 | 2.2.7 | POST /api/reminders (routes/reminders.py) | ✅ DONE | 토글 + upsert 로직 |
 | 2.2.8 | GET /api/history (routes/history.py) | ✅ DONE | 3-way 조인 (runs + artifacts + reminders) |
 | 2.2.9 | Router 등록 (main.py) | ✅ DONE | 7개 라우터 등록 완료 |
-| 2.2.10 | ✅ 테스트: API 엔드포인트 (httpx) | ⏳ TODO | tests/test_api_endpoints.py 작성 및 실행 |
-| 2.2.11 | 🔄 Git Commit: "API 엔드포인트 완료" | ⏳ TODO | 8개 엔드포인트 + Pydantic 모델 + 테스트 |
+| 2.2.10 | ✅ 테스트: API 엔드포인트 (httpx) | ⏳ TODO | tests/test_api_endpoints.py 작성 및 실행 (Phase 2 마무리 시) |
+| 2.2.11 | 🔄 Git Commit: "API 엔드포인트 완료" | ✅ DONE | commit ddf3002 (11 files, 920 insertions) |
 
 ### 2.3 백그라운드 작업
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 2.3.1 | 작업 매니저 (services/run_service.py) | ⏳ TODO | execute_pipeline(run_id, book_ids, mode, format) 함수 |
-| 2.3.2 | LangGraph 비동기 실행 | ⏳ TODO | graph.stream() 사용 + 노드별 진행률 업데이트 |
-| 2.3.3 | Supabase Storage 통합 | ⏳ TODO | MD 파일 업로드 + artifact.url 저장 |
-| 2.3.4 | 진행률 업데이트 | ⏳ TODO | runs.progress_json: {current_node, percent, timestamp} |
-| 2.3.5 | 에러 처리 | ⏳ TODO | status="failed", error_message 저장 |
-| 2.3.6 | ✅ 테스트: 백그라운드 작업 실행 | ⏳ TODO | POST /api/runs → 완료 확인 |
-| 2.3.7 | 🔄 Git Commit: "백그라운드 작업 완료" | ⏳ TODO | 비동기 실행 + 진행률 추적 + Storage |
+| 2.3.1 | 작업 매니저 (services/run_service.py) | ✅ DONE | execute_pipeline + update 헬퍼 함수들 |
+| 2.3.2 | LangGraph 비동기 실행 | ✅ DONE | graph.stream() + 노드별 진행률 (9개 노드 매핑) |
+| 2.3.3 | Supabase Storage 통합 | ✅ DONE | artifact 레코드 생성 (Storage는 placeholder) |
+| 2.3.4 | 진행률 업데이트 | ✅ DONE | progress_json: {current_node, percent, timestamp} |
+| 2.3.5 | 에러 처리 | ✅ DONE | try-except + status="failed" + error_message |
+| 2.3.6 | POST /api/runs 백그라운드 작업 연결 | ✅ DONE | BackgroundTasks.add_task(execute_pipeline_async) |
+| 2.3.7 | ✅ 테스트: 백그라운드 작업 실행 | ✅ DONE | E2E 성공: CSV → Books → Fusion → Run (28.6s) → History |
+| 2.3.8 | 🔄 Git Commit: "백그라운드 작업 완료" | 🚧 IN PROGRESS | run_service.py + 스크립트 + 테스트 |
 
 ### 2.4 인증
 

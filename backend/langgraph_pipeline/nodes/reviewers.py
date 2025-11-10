@@ -94,7 +94,9 @@ def review_domain_node(state: OnePagerState, domain: str = None) -> Dict[str, An
     
     # 1권만 처리
     if not book_ids:
-        return {"error_message": f"[{domain}] No book_ids provided"}
+        logger.error(f"[{domain}] No book_ids provided")
+        # error_message는 반환하지 않음 (병렬 실행 시 충돌 방지)
+        return {"messages": [HumanMessage(content=f"[{domain}] Error: No book_ids", name=f"Reviewer_{domain}")]}
     
     book_id = book_ids[0]
     

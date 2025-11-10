@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
 from backend.core.database import get_supabase_admin
 from backend.models.schemas import RunCreate, RunResponse, RunProgress
+from backend.services.run_service import execute_pipeline_async
 from supabase import Client
 from typing import Dict, Any
 import logging
@@ -69,10 +70,17 @@ async def create_run(
         
         run = run_result.data[0]
         
-        # TODO: Phase 2.3에서 백그라운드 작업 구현
-        # background_tasks.add_task(execute_pipeline, run["id"], run_data.book_ids, run_data.mode, run_data.format)
+        # 백그라운드 작업 등록
+        background_tasks.add_task(
+            execute_pipeline_async,
+            run["id"],
+            run_data.book_ids,
+            run_data.mode,
+            run_data.format
+        )
+        
         logger.info(f"[RUN] Created run {run['id']} with {len(run_data.book_ids)} books (mode={run_data.mode})")
-        logger.warning("[TODO] Background task not implemented yet (Phase 2.3)")
+        logger.info(f"[RUN] Background task scheduled for run {run['id']}")
         
         return RunResponse(
             id=run["id"],
