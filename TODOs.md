@@ -216,7 +216,7 @@
 | 2.3.5 | 에러 처리 | ✅ DONE | try-except + status="failed" + error_message |
 | 2.3.6 | POST /api/runs 백그라운드 작업 연결 | ✅ DONE | BackgroundTasks.add_task(execute_pipeline_async) |
 | 2.3.7 | ✅ 테스트: 백그라운드 작업 실행 | ✅ DONE | E2E 성공: CSV → Books → Fusion → Run (28.6s) → History |
-| 2.3.8 | 🔄 Git Commit: "백그라운드 작업 완료" | 🚧 IN PROGRESS | run_service.py + 스크립트 + 테스트 |
+| 2.3.8 | 🔄 Git Commit: "백그라운드 작업 완료" | ✅ DONE | commit ee10dd7 (8 files, 670 insertions) |
 
 ### 2.4 인증
 

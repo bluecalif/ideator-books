@@ -50,7 +50,19 @@ async def upload_csv(
             )
         
         # 임시 user_id (TODO: Phase 2.4에서 실제 인증 구현)
+        # Note: users 테이블에 미리 생성되어 있어야 함
         temp_user_id = "00000000-0000-0000-0000-000000000001"
+        
+        # 임시 user 존재 확인 및 생성
+        user_check = supabase.table("users").select("id").eq("id", temp_user_id).execute()
+        if not user_check.data:
+            # users 테이블에 임시 user 생성 (auth.users FK 우회를 위해 RLS 비활성화 필요)
+            logger.warning(f"[WARN] Test user {temp_user_id} not found, attempting to create...")
+            # 실제로는 Supabase Auth 또는 Dashboard에서 생성해야 함
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Test user not found. Please run: python backend/scripts/create_test_user.py"
+            )
         
         # Library 생성
         library_name = file.filename.replace('.csv', '')
