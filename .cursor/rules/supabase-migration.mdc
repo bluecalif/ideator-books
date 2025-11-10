@@ -1,0 +1,187 @@
+---
+alwaysApply: true
+description: Supabase 데이터베이스 마이그레이션 핵심 가이드
+---
+
+# Supabase Migration Standards
+
+## Overview
+Supabase PostgreSQL 마이그레이션 및 스키마 관리. 8개 테이블 (users, libraries, books, kb_items, runs, artifacts, reminders, audits) 기반 구조.
+
+## Domain Knowledge
+
+### 핵심 관계
+- users → libraries → books
+- users → runs → artifacts → reminders
+- Project: `xsrbxmhrnamsyhldjuju`
+
+## Standards & Conventions
+
+### 파일 구조
+```
+backend/sql/schema.sql       # 전체 스키마
+backend/sql/README.md        # 실행 가이드
+backend/tests/test_database_simple.py  # 검증 테스트
+```
+
+### 핵심 네이밍
+- 테이블: 복수형 snake_case (`kb_items`)
+- Primary Key: `id` (UUID)
+- Foreign Key: `{table}_id` (`user_id`)
+- Timestamp: `created_at` (TIMESTAMPTZ)
+- JSON: `{name}_json` (JSONB)
+
+### 데이터 타입
+- ID → `UUID DEFAULT uuid_generate_v4()`
+- Timestamp → `TIMESTAMPTZ DEFAULT NOW()`
+- JSON → `JSONB` (쿼리 가능)
+- Enum → CHECK constraint
+
+## Implementation Patterns
+
+### 1. 테이블 생성 (FK 순서 주의)
+```sql
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS libraries (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT unique_user_library UNIQUE (user_id, name)
+);
+```
+
+### 2. 인덱스
+```sql
+-- FK 인덱스 (필수)
+CREATE INDEX IF NOT EXISTS idx_libraries_user ON libraries(user_id);
+
+-- JSONB GIN 인덱스
+CREATE INDEX IF NOT EXISTS idx_books_meta ON books USING GIN(meta_json);
+
+-- 조건부 인덱스
+CREATE INDEX IF NOT EXISTS idx_reminders_schedule 
+    ON reminders(schedule) WHERE active = TRUE;
+```
+
+### 3. Row Level Security (RLS)
+```sql
+ALTER TABLE libraries ENABLE ROW LEVEL SECURITY;
+
+-- 본인 데이터만 접근
+CREATE POLICY "Users access own libraries"
+    ON libraries FOR ALL
+    USING (auth.uid() = user_id);
+
+-- 공개 읽기
+CREATE POLICY "KB items public read"
+    ON kb_items FOR SELECT
+    USING (TRUE);
+```
+
+### 4. CHECK Constraint
+```sql
+CREATE TABLE runs (
+    status TEXT CHECK (status IN ('pending', 'running', 'completed', 'failed'))
+);
+```
+
+### 마이그레이션 실행
+
+#### Dashboard (권장)
+1. https://supabase.com/dashboard → 프로젝트 선택
+2. SQL Editor → New query
+3. `backend/sql/schema.sql` 복사 → 붙여넣기 → RUN
+
+#### CLI (자동화용)
+```powershell
+supabase login
+supabase link --project-ref xsrbxmhrnamsyhldjuju
+supabase migration list --linked
+```
+
+### 테스트
+
+```python
+# backend/tests/test_database_simple.py
+from backend.core.database import get_supabase_admin
+
+def test_tables_exist():
+    supabase = get_supabase_admin()
+    tables = ['users', 'libraries', 'books', 'kb_items', 
+              'runs', 'artifacts', 'reminders', 'audits']
+    for table in tables:
+        supabase.table(table).select("*").limit(0).execute()
+```
+
+```powershell
+# 실행
+$env:PYTHONPATH = "C:\Projects\vibe-coding\ideator-books"
+python backend\tests\test_database_simple.py
+```
+
+### Python Client 패턴
+
+```python
+# Admin (RLS 우회)
+from backend.core.database import get_supabase_admin
+supabase = get_supabase_admin()
+
+# User (RLS 적용)
+from backend.core.database import get_supabase
+supabase = get_supabase()
+
+# JSONB 쿼리
+books = supabase.table("books") \
+    .filter("meta_json->>domain", "eq", "경제경영") \
+    .execute()
+```
+
+## 문제 해결
+
+### .env 인코딩 에러
+```powershell
+# BOM 제거
+Get-Content .env -Raw | Out-File -FilePath .env -Encoding UTF8 -NoNewline
+```
+
+### CORS_ORIGINS 파싱 에러
+```python
+# Pydantic validator 추가
+@field_validator('cors_origins', mode='before')
+@classmethod
+def parse_cors_origins(cls, v):
+    return [x.strip() for x in v.split(',')] if isinstance(v, str) else v
+```
+
+### 테이블 재생성
+```sql
+-- 의존 관계 역순 삭제
+DROP TABLE IF EXISTS audits, reminders, artifacts, runs, 
+                     kb_items, books, libraries, users CASCADE;
+```
+
+## Checklist
+
+### 스키마 작성
+- [ ] `IF NOT EXISTS` 사용
+- [ ] FK 순서 확인 (부모 → 자식)
+- [ ] `ON DELETE CASCADE` 설정
+- [ ] UUID + TIMESTAMPTZ 기본값
+- [ ] JSONB 사용, CHECK constraint 추가
+
+### RLS
+- [ ] 모든 테이블 RLS 활성화
+- [ ] `auth.uid() = user_id` 패턴
+- [ ] 공개 데이터는 `USING (TRUE)`
+
+### 실행 후
+- [ ] 테이블 생성 확인 (8개)
+- [ ] 테스트 스크립트 실행
+- [ ] Git commit
+
+## References
+- 스키마: `backend/sql/schema.sql`
+- 가이드: `backend/sql/README.md`
+- 테스트: `backend/tests/test_database_simple.py`

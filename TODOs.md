@@ -78,7 +78,7 @@
 | 1.4.17 | ✅ 테스트: 1권당 1p 생성 (1권) | ✅ DONE | 54초, 8개 노드, 1,708자 |
 | 1.4.18 | book_summary State 전달 개선 | ✅ DONE | book_summaries → book_summary/title/topic |
 | 1.4.19 | 디버그 로그 추가 | ✅ DONE | AnchorMapper, Reviewer 입력 확인 |
-| 1.4.20 | 🔄 Git Commit: "LangGraph 노드 구현 완료" | ⏳ TODO | 5개 노드 + 1권당 1p + 테스트 |
+| 1.4.20 | 🔄 Git Commit: "LangGraph 노드 구현 완료" | ✅ DONE | 5개 노드 + 1권당 1p + 테스트 (커밋 5e4806d) |
 
 **구현 핵심:**
 - Reviewers: functools.partial + Send() API로 병렬 실행
@@ -163,7 +163,7 @@
 | 1.6.2 | Producer 리팩토링 | ✅ DONE | Input 최소화 (integration_result + book_summary), 제안서만 창작 |
 | 1.6.3 | 최종 1p 조립 함수 분리 | ✅ DONE | utils.assemble_final_1p() + graph.assemble_node() |
 | 1.6.4 | ✅ 테스트: 리팩토링 검증 | ✅ DONE | 9개 노드, 가짜 앵커 0개, anchored_by 63.0% |
-| 1.6.5 | 🔄 Git Commit: "Phase 1.6 완료" | 🚧 IN PROGRESS | 아키텍처 정리 |
+| 1.6.5 | 🔄 Git Commit: "Phase 1.6 완료" | ✅ DONE | 아키텍처 정리 (커밋 3e1564d) |
 
 **Phase 1.6 성과:**
 - ✅ **모드 명확화**: "synthesis" (긴장축 3개) vs "simple_merge" (4개 병치)
@@ -181,46 +181,51 @@
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 2.1.1 | SQL 스키마 작성 | ⏳ TODO | 7개 테이블 (users, libraries, books, kb_items, runs, artifacts, reminders, audits) |
-| 2.1.2 | 인덱스 및 외래키 설정 | ⏳ TODO | 성능 최적화 |
-| 2.1.3 | Row Level Security (RLS) 설정 | ⏳ TODO | 사용자별 데이터 격리 |
-| 2.1.4 | ✅ 테스트: Supabase 연결 및 쿼리 | ⏳ TODO | 테이블 생성/조회 확인 |
-| 2.1.5 | 🔄 Git Commit: "Supabase 스키마 완료" | ⏳ TODO | SQL + 마이그레이션 |
+| 2.1.1 | SQL 스키마 작성 (backend/sql/schema.sql) | ✅ DONE | 8개 테이블 + 인덱스 + RLS 정책 |
+| 2.1.2 | 인덱스 및 제약조건 설정 | ✅ DONE | FK(ON DELETE CASCADE), 인덱스(user_id, status, anchor_id), GIN(jsonb) |
+| 2.1.3 | Row Level Security (RLS) 설정 | ✅ DONE | auth.uid() 기반 격리, kb_items 공개 읽기 전용 |
+| 2.1.4 | Supabase 마이그레이션 실행 | ✅ DONE | Dashboard 완료 + CLI 연결 완료 |
+| 2.1.5 | ✅ 테스트: 테이블 생성 및 기본 쿼리 | ✅ DONE | 8개 테이블 모두 검증 완료 |
+| 2.1.6 | 🔄 Git Commit: "Supabase 스키마 완료" | 🚧 IN PROGRESS | SQL 파일 + README + 테스트 |
 
 ### 2.2 API 엔드포인트
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 2.2.1 | POST /api/upload | ⏳ TODO | CSV 업로드 |
-| 2.2.2 | GET /api/books | ⏳ TODO | 도서 조회 (필터) |
-| 2.2.3 | POST /api/fusion/preview | ⏳ TODO | Fusion Helper |
-| 2.2.4 | POST /api/runs | ⏳ TODO | 1p 생성 요청 |
-| 2.2.5 | GET /api/runs/{id} | ⏳ TODO | 진행 상태 |
-| 2.2.6 | GET /api/artifacts/{id} | ⏳ TODO | MD/PDF 다운로드 |
-| 2.2.7 | POST /api/reminders | ⏳ TODO | 리마인드 on/off |
-| 2.2.8 | GET /api/history | ⏳ TODO | 히스토리 목록 |
-| 2.2.9 | ✅ 테스트: API 엔드포인트 (curl/httpx) | ⏳ TODO | 각 엔드포인트 응답 확인 |
-| 2.2.10 | 🔄 Git Commit: "API 엔드포인트 완료" | ⏳ TODO | 8개 엔드포인트 + 테스트 |
+| 2.2.0 | Pydantic 모델 확장 (models/schemas.py) | ⏳ TODO | Library, Book, Run, Artifact, Reminder 요청/응답 모델 |
+| 2.2.1 | POST /api/upload (routes/upload.py) | ⏳ TODO | CSV 파싱(pandas) → libraries/books 테이블 생성 |
+| 2.2.2 | GET /api/books (routes/books.py) | ⏳ TODO | 필터링: domain, year_range, topic, library_id |
+| 2.2.3 | POST /api/fusion/preview (routes/fusion.py) | ⏳ TODO | 도서 수 기반 추천(synthesis/simple_merge) + 샘플 제공 |
+| 2.2.4 | POST /api/runs (routes/runs.py) | ⏳ TODO | 1p 생성 요청 + BackgroundTasks 등록 |
+| 2.2.5 | GET /api/runs/{id} (routes/runs.py) | ⏳ TODO | 진행 상태 조회 (status, progress_json) |
+| 2.2.6 | GET /api/artifacts/{id} (routes/artifacts.py) | ⏳ TODO | MD 직접 반환 or PDF URL 리디렉트 |
+| 2.2.7 | POST /api/reminders (routes/reminders.py) | ⏳ TODO | 리마인드 on/off 토글 |
+| 2.2.8 | GET /api/history (routes/history.py) | ⏳ TODO | 히스토리 목록 (runs + artifacts + reminders 조인) |
+| 2.2.9 | Router 등록 (main.py) | ⏳ TODO | 8개 라우터 include_router 추가 |
+| 2.2.10 | ✅ 테스트: API 엔드포인트 (httpx) | ⏳ TODO | tests/test_api_endpoints.py 작성 및 실행 |
+| 2.2.11 | 🔄 Git Commit: "API 엔드포인트 완료" | ⏳ TODO | 8개 엔드포인트 + Pydantic 모델 + 테스트 |
 
 ### 2.3 백그라운드 작업
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 2.3.1 | 백그라운드 작업 매니저 | ⏳ TODO | FastAPI BackgroundTasks |
-| 2.3.2 | LangGraph 비동기 실행 | ⏳ TODO | graph.stream() 사용 |
-| 2.3.3 | 진행률 업데이트 | ⏳ TODO | 각 노드 완료 시 DB 업데이트 |
-| 2.3.4 | 에러 처리 및 재시도 | ⏳ TODO | thread_id 기반 재개 |
-| 2.3.5 | ✅ 테스트: 백그라운드 작업 실행 | ⏳ TODO | 1p 생성 end-to-end |
-| 2.3.6 | 🔄 Git Commit: "백그라운드 작업 완료" | ⏳ TODO | 비동기 실행 + 진행률 추적 |
+| 2.3.1 | 작업 매니저 (services/run_service.py) | ⏳ TODO | execute_pipeline(run_id, book_ids, mode, format) 함수 |
+| 2.3.2 | LangGraph 비동기 실행 | ⏳ TODO | graph.stream() 사용 + 노드별 진행률 업데이트 |
+| 2.3.3 | Supabase Storage 통합 | ⏳ TODO | MD 파일 업로드 + artifact.url 저장 |
+| 2.3.4 | 진행률 업데이트 | ⏳ TODO | runs.progress_json: {current_node, percent, timestamp} |
+| 2.3.5 | 에러 처리 | ⏳ TODO | status="failed", error_message 저장 |
+| 2.3.6 | ✅ 테스트: 백그라운드 작업 실행 | ⏳ TODO | POST /api/runs → 완료 확인 |
+| 2.3.7 | 🔄 Git Commit: "백그라운드 작업 완료" | ⏳ TODO | 비동기 실행 + 진행률 추적 + Storage |
 
 ### 2.4 인증
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 2.4.1 | Supabase Auth 연동 | ⏳ TODO | JWT 검증 |
-| 2.4.2 | 인증 미들웨어 | ⏳ TODO | @require_auth |
-| 2.4.3 | ✅ 테스트: 인증 플로우 | ⏳ TODO | 로그인/JWT 검증 |
-| 2.4.4 | 🔄 Git Commit: "Phase 2 완료" | ⏳ TODO | API 레이어 전체 |
+| 2.4.1 | JWT 검증 함수 (core/auth.py) | ⏳ TODO | verify_token() + get_current_user() 구현 |
+| 2.4.2 | 인증 Dependency | ⏳ TODO | require_auth() FastAPI Depends 함수 |
+| 2.4.3 | 엔드포인트 보호 | ⏳ TODO | 모든 API에 user_id = Depends(require_auth) 추가 |
+| 2.4.4 | ✅ 테스트: 인증 플로우 | ⏳ TODO | 401 Unauthorized 응답 확인 |
+| 2.4.5 | 🔄 Git Commit: "Phase 2 완료" | ⏳ TODO | API 레이어 전체 (DB + API + 백그라운드 + 인증) |
 
 ---
 
