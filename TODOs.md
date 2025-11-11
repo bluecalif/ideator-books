@@ -259,7 +259,7 @@
 | 3.2.6 | /history | ✅ DONE | 히스토리 목록(페이지네이션), 복습 카드 섹션, 항목 클릭 시 미리보기 | history-card 재사용 |
 | 3.2.7 | ✅ 테스트: 각 화면 API 연동 확인 | ✅ DONE | 백엔드 API 호출 및 응답 검증, 주요 플로우 테스트 완료 |
 | 3.2.8 | ✅ 테스트: E2E 사용자 플로우 | ✅ DONE | Library → Books → Fusion → Runs → Preview 기본 플로우 확인 |
-| 3.2.9 | 🔄 Git Commit: "Phase 3 완료" | ⏳ TODO | 프론트엔드 6개 화면 + 컴포넌트 + API 연동 |
+| 3.2.9 | 🔄 Git Commit: "Phase 3 완료" | ✅ DONE | Phase 3.3 커밋에 포함 (commit 8560656) |
 
 **Phase 3 주요 수정 및 개선:**
 - ✅ API Contract Sync: `.cursor/rules/api-contract-sync.mdc` 생성 (백엔드-프론트엔드 계약 동기화 규칙)
@@ -295,13 +295,18 @@
 | 3.3.7 | 통합 기록 간소화 (simple_merge) | ✅ DONE | 도메인 리뷰 참조로 간소화 |
 | 3.3.8 | 도메인 통일 (constants) | ✅ DONE | backend/core/constants.py, frontend/lib/constants.ts |
 | 3.3.9 | 히스토리 날짜별/분야별 Tabs | ✅ DONE | Tabs + Collapsible, domain 필드 추가 |
-| 3.3.10 | 🔄 Git Commit: "Phase 3.3 완료" | 🚧 IN PROGRESS | KB 초기화 + UI 개선 + 도메인 통일 |
+| 3.3.10 | 🔄 Git Commit: "Phase 3.3 완료" | ✅ DONE | commit 8560656 (71 files, 14,799 insertions) |
 
-**예상 성과:**
-- ✅ anchored_by: 24.4% → **70%+** (백엔드 수준)
-- ✅ 가짜 앵커: 4개 → **0개**
-- ✅ KB 검색 경고 사라짐
-- ✅ `[OK] Available anchors: 144 items` 로그 출력
+**Phase 3.3 최종 성과:**
+- ✅ KB Service 자동 로드 (144개 항목)
+- ✅ KB 파일 경로 수정 (작업 디렉토리 독립적)
+- ✅ 네비게이션 바 (전체 페이지)
+- ✅ 히스토리 카드 개선 (출발 지식, 1p 제목, CTA)
+- ✅ 히스토리 삭제 기능
+- ✅ 1p 템플릿 개선 (출발 지식 가독성, 형식 분기/통합 기록 간소화)
+- ✅ 도메인 통일 (backend/core/constants.py, frontend/lib/constants.ts)
+- ✅ 히스토리 날짜별/분야별 Tabs
+- ✅ 프론트엔드 6개 화면 완성
 
 ---
 
