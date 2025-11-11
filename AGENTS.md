@@ -1,7 +1,7 @@
 # AI 에이전트 운영 가이드
 
 > **환경**: Windows PowerShell 5.1  
-> **프로젝트**: ideator-books (Next.js + FastAPI + LangGraph)
+> **프로젝트**: 
 
 ---
 
