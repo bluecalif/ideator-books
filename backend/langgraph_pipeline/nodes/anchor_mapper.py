@@ -10,8 +10,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# 도메인 리스트
-DOMAINS = ["경제경영", "과학기술", "역사사회", "인문자기계발"]
+# KB 도메인 리스트 (KB 검색용 - 슬래시 없음)
+KB_DOMAINS = kb_service.KB_DOMAINS
 
 
 def anchor_mapper_node(state: OnePagerState) -> Dict[str, Any]:
@@ -61,7 +61,7 @@ def anchor_mapper_node(state: OnePagerState) -> Dict[str, Any]:
     anchors = {}
     anchor_details = []
 
-    for domain in DOMAINS:
+    for domain in KB_DOMAINS:
         # KB 검색 (단일 책 요약 사용)
         results = kb_service.search(query=book_summary, domain=domain, top_k=3)
 

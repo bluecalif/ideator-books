@@ -103,7 +103,7 @@ async def create_run(
         )
 
 
-@router.get("/runs/{run_id}", response_model=RunResponse)
+@router.get("/runs/{run_id}")
 async def get_run_status(
     run_id: str,
     supabase: Client = Depends(get_supabase_admin)
@@ -115,9 +115,9 @@ async def get_run_status(
     - progress_json: 현재 노드, 진행률
     """
     try:
-        # Run 조회
+        # Run 조회 (artifacts 포함)
         run_result = supabase.table("runs") \
-            .select("*") \
+            .select("*, artifacts(*)") \
             .eq("id", run_id) \
             .execute()
         
@@ -129,16 +129,20 @@ async def get_run_status(
         
         run = run_result.data[0]
         
-        return RunResponse(
-            id=run["id"],
-            user_id=run["user_id"],
-            status=run["status"],
-            progress_json=RunProgress(**run["progress_json"]),
-            params_json=run["params_json"],
-            error_message=run.get("error_message"),
-            created_at=run["created_at"],
-            completed_at=run.get("completed_at")
-        )
+        # RunResponse에 artifacts 추가
+        response_data = {
+            "id": run["id"],
+            "user_id": run["user_id"],
+            "status": run["status"],
+            "progress_json": RunProgress(**run["progress_json"]),
+            "params_json": run["params_json"],
+            "error_message": run.get("error_message"),
+            "created_at": run["created_at"],
+            "completed_at": run.get("completed_at"),
+            "artifacts": run.get("artifacts", [])  # artifacts 추가
+        }
+        
+        return response_data
         
     except HTTPException:
         raise
@@ -147,5 +151,59 @@ async def get_run_status(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Run 상태 조회 실패: {str(e)}"
+        )
+
+
+@router.delete("/runs/{run_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_run(
+    run_id: str,
+    user_id: str = Depends(require_auth),
+    supabase: Client = Depends(get_supabase_admin)
+):
+    """
+    Run 삭제 (Cascade로 artifacts, audits도 자동 삭제됨)
+    
+    - 본인의 run만 삭제 가능
+    - ON DELETE CASCADE로 관련 데이터 자동 삭제
+    """
+    try:
+        # Run 존재 및 권한 확인
+        run_result = supabase.table("runs") \
+            .select("id, user_id") \
+            .eq("id", run_id) \
+            .execute()
+        
+        if not run_result.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Run을 찾을 수 없습니다"
+            )
+        
+        run = run_result.data[0]
+        
+        # 권한 확인
+        if run["user_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="삭제 권한이 없습니다"
+            )
+        
+        # Run 삭제 (Cascade로 artifacts, audits 자동 삭제)
+        delete_result = supabase.table("runs") \
+            .delete() \
+            .eq("id", run_id) \
+            .execute()
+        
+        logger.info(f"[RUN] Deleted run {run_id} by user {user_id}")
+        
+        return None  # 204 No Content
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to delete run: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Run 삭제 실패: {str(e)}"
         )
 

@@ -126,7 +126,8 @@ def initiate_reviews(state: OnePagerState):
     Returns:
         Send() 명령 리스트
     """
-    domains = ["경제경영", "과학기술", "역사사회", "인문자기계발"]
+    from backend.services.kb_service import kb_service
+    domains = kb_service.KB_DOMAINS  # ["경제경영", "과학기술", "역사사회", "인문자기계발"]
     
     return [
         Send(

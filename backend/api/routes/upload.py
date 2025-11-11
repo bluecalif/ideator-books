@@ -1,6 +1,7 @@
 """CSV Upload API"""
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
 from backend.core.database import get_supabase_admin
+from backend.core.auth import require_auth
 from backend.models.schemas import LibraryResponse
 from supabase import Client
 import pandas as pd
@@ -13,9 +14,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+from backend.core.auth import get_optional_user
+
 @router.post("/upload", response_model=LibraryResponse, status_code=status.HTTP_201_CREATED)
 async def upload_csv(
     file: UploadFile = File(...),
+    user_id: str = Depends(get_optional_user),
     supabase: Client = Depends(get_supabase_admin)
 ):
     """
@@ -49,27 +53,30 @@ async def upload_csv(
                 detail=f"필수 컬럼 누락: {', '.join(missing_columns)}"
             )
         
-        # 임시 user_id (TODO: Phase 2.4에서 실제 인증 구현)
-        # Note: users 테이블에 미리 생성되어 있어야 함
-        temp_user_id = "00000000-0000-0000-0000-000000000001"
-        
-        # 임시 user 존재 확인 및 생성
-        user_check = supabase.table("users").select("id").eq("id", temp_user_id).execute()
+        # User 존재 확인 및 생성 (Supabase Auth 사용자는 users 테이블에도 레코드 필요)
+        user_check = supabase.table("users").select("id").eq("id", user_id).execute()
         if not user_check.data:
-            # users 테이블에 임시 user 생성 (auth.users FK 우회를 위해 RLS 비활성화 필요)
-            logger.warning(f"[WARN] Test user {temp_user_id} not found, attempting to create...")
-            # 실제로는 Supabase Auth 또는 Dashboard에서 생성해야 함
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Test user not found. Please run: python backend/scripts/create_test_user.py"
-            )
+            # users 테이블에 레코드 생성
+            logger.info(f"[UPLOAD] Creating user record for {user_id}")
+            
+            # auth.users에서 이메일 가져오기
+            auth_user = supabase.auth.admin.get_user_by_id(user_id)
+            user_email = auth_user.user.email if auth_user and auth_user.user else f"{user_id}@temp.com"
+            
+            supabase.table("users").insert({
+                "id": user_id,
+                "email": user_email,
+                "name": None
+            }).execute()
         
-        # Library 생성
+        # Library 생성 (타임스탬프 추가로 중복 방지)
         library_name = file.filename.replace('.csv', '')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        library_name_unique = f"{library_name}_{timestamp}"
         
         library_result = supabase.table("libraries").insert({
-            "user_id": temp_user_id,
-            "name": library_name,
+            "user_id": user_id,
+            "name": library_name_unique,
             "uploaded_at": datetime.now().isoformat()
         }).execute()
         

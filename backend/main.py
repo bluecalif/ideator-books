@@ -3,6 +3,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.core.config import settings
 import logging
+import os
+
+# Set environment variables for LangChain/OpenAI
+os.environ["OPENAI_API_KEY"] = settings.openai_api_key
 
 # Configure logging
 logging.basicConfig(
@@ -10,6 +14,11 @@ logging.basicConfig(
     format="[%(levelname)s] %(asctime)s - %(name)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# KB Service auto-loads on import (see kb_service.py)
+# Verify KB is loaded
+from backend.services.kb_service import kb_service
+logger.info(f"[INIT] KB Service status: {len(kb_service.all_items)} items loaded")
 
 # Create FastAPI app
 app = FastAPI(
@@ -50,9 +59,10 @@ async def health_check():
 
 
 # Include API routers
-from backend.api.routes import upload, books, fusion, runs, artifacts, reminders, history
+from backend.api.routes import upload, libraries, books, fusion, runs, artifacts, reminders, history
 
 app.include_router(upload.router, prefix="/api", tags=["upload"])
+app.include_router(libraries.router, prefix="/api", tags=["libraries"])
 app.include_router(books.router, prefix="/api", tags=["books"])
 app.include_router(fusion.router, prefix="/api", tags=["fusion"])
 app.include_router(runs.router, prefix="/api", tags=["runs"])

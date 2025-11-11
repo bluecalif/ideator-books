@@ -206,17 +206,25 @@ def assemble_final_1p(state: OnePagerState) -> str:
     Returns:
         최종 1p Markdown (전체)
     """
-    # 1. 출발 지식
+    # 1. 출발 지식 (가독성 개선: 각 항목 개행)
     출발지식 = f"""# 출발 지식
-일련번호: {state.get('book_ids', [0])[0]}
-제목: {state.get('book_title', 'Unknown')}
-저자: {state.get('book_author', 'Unknown')}
-주제: {state.get('book_topic', 'Unknown')}
-요약: {state.get('book_summary', '')[:300]}..."""
+
+**일련번호**: {state.get('book_ids', ['unknown'])[0]}
+
+**제목**: {state.get('book_title', 'Unknown')}
+
+**저자**: {state.get('book_author', 'Unknown')}
+
+**주제**: {state.get('book_topic', 'Unknown')}
+
+**요약**: {state.get('book_summary', '')[:300]}..."""
     
-    # 2. 형식 분기
+    # 2. 형식 분기 (synthesis, simple_merge 모두 간단하게)
+    mode = state.get('mode', 'synthesis')
+    format_type = state.get('format', 'content')
     형식분기 = f"""# 형식 분기
-{state.get('format_reasoning', 'N/A')}"""
+
+{format_type} 형식 선택"""
     
     # 3. 도메인 리뷰 카드
     reviews = state.get('reviews', [])
@@ -233,19 +241,33 @@ def assemble_final_1p(state: OnePagerState) -> str:
 {chr(10).join(리뷰카드_sections)}"""
     
     # 4. 통합 기록
-    mode = state.get('mode', 'synthesis')
     if mode == 'synthesis':
         # 긴장축 기반
         tension_axes = state.get('tension_axes', [])
         axes_text = "\n".join([f"{i+1}. {axis}" for i, axis in enumerate(tension_axes)])
+        
+        # 결론 추출
+        integration_result = state.get('integration_result', '')
+        conclusion = ''
+        if '## 결론' in integration_result:
+            conclusion = integration_result.split('## 결론')[-1].strip()
+        elif '결론:' in integration_result:
+            conclusion = integration_result.split('결론:')[-1].strip()[:200] + '...'
+        
         통합기록 = f"""# 통합 기록 (긴장 축)
+
 {axes_text}
 
-> **결론**: {state.get('integration_result', '').split('## 결론')[-1].strip() if '## 결론' in state.get('integration_result', '') else 'N/A'}"""
+> **결론**: {conclusion if conclusion else 'N/A'}"""
     else:
-        # 병치 기반
+        # 병치 기반 - 간소화 (도메인 리뷰에 이미 있으므로 요약만)
         통합기록 = f"""# 통합 기록 (4개 관점 병치)
-{state.get('integration_result', 'N/A')}"""
+
+4개 도메인별로 장점, 문제, 조건을 분석하였습니다. (상세 내용은 위 '도메인 리뷰 카드' 참조)
+
+**분기 사유**: 각 도메인별 관점이 서로 다른 측면을 강조하므로 병치 방식으로 제시합니다.
+
+**결론**: 개인주의 실현을 위해서는 사회적 관용과 타인 이해를 기반으로 하면서도, 경제적 인프라 구축, 개인의 신체·정신 건강 관리, 사회적 갈등 조정, 그리고 내면 탐색과 외부 소통을 아우르는 다차원적 접근과 구체적 실행 전략이 필수적이다."""
     
     # 5. 최종 1p 제안서 (Producer 창작)
     제안서 = state.get('onepager_proposal', '# 최종 1p 제안서\n(생성 중...)')

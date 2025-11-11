@@ -127,3 +127,4 @@ def get_optional_user(authorization: str = Header(None)) -> Optional[str]:
         # 인증 실패 시 None 반환 (에러 발생시키지 않음)
         return None
 
+

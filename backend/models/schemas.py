@@ -120,6 +120,7 @@ class RunResponse(BaseModel):
     error_message: Optional[str] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
+    artifacts: Optional[List[Dict[str, Any]]] = None  # Artifact 목록 추가
 
 
 # ============================================
@@ -163,13 +164,14 @@ class ReminderResponse(BaseModel):
 
 class HistoryResponse(BaseModel):
     """History 응답 (runs + artifacts + reminders 조인)"""
-    run_id: str
+    id: str  # run_id (프론트엔드 호환성)
     status: str
+    domain: Optional[str] = None  # 도서 도메인 (분야별 정렬용)
     created_at: datetime
     completed_at: Optional[datetime] = None
     artifacts: List[ArtifactResponse]
-    reminder: Optional[ReminderResponse] = None
-    params: Dict[str, Any]
+    reminders: List[ReminderResponse] = []  # 프론트엔드에서 배열 기대
+    params_json: Dict[str, Any]  # params → params_json으로 일치
 
 
 # ============================================

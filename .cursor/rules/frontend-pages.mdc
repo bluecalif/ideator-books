@@ -13,9 +13,9 @@ Guidelines for implementing Next.js 14+ App Router pages and components for the 
 ### 6 Main Pages
 1. **/library** - CSV upload and recent results
 2. **/books/select** - Book selection with filters
-3. **/fusion** - Fusion mode selection (Reduce vs Simple Merge)
-4. **/runs/[id]** - Generation progress tracking
-5. **/preview/[id]** - 1p preview and approval
+3. **/fusion** - Fusion mode selection (Synthesis vs Simple Merge)
+4. **/runs/[id]** - Generation progress tracking (9 nodes)
+5. **/preview/[id]** - 1p preview with anchor toggle
 6. **/history** - User's generation history
 
 ### User Flow
@@ -27,33 +27,31 @@ Library → Books Selection → Fusion Helper → Progress → Preview → Histo
 ```
 frontend/
 ├── app/
-│   ├── layout.tsx              # Root layout with auth
-│   ├── library/
-│   │   └── page.tsx            # CSV upload
-│   ├── books/
-│   │   └── select/
-│   │       └── page.tsx        # Book selection
-│   ├── fusion/
-│   │   └── page.tsx            # Fusion mode
-│   ├── runs/
-│   │   └── [id]/
-│   │       └── page.tsx        # Progress tracking
-│   ├── preview/
-│   │   └── [id]/
-│   │       └── page.tsx        # 1p preview
-│   └── history/
-│       └── page.tsx            # History list
+│   ├── layout.tsx              # Root layout + Providers
+│   ├── auth/
+│   │   └── page.tsx            # Supabase Auth UI
+│   ├── library/page.tsx        # CSV upload
+│   ├── books/select/page.tsx   # Book selection
+│   ├── fusion/page.tsx         # Fusion mode
+│   ├── runs/[id]/page.tsx      # Progress tracking
+│   ├── preview/[id]/page.tsx   # 1p preview
+│   └── history/page.tsx        # History list
+├── middleware.ts               # Auth check
 ├── components/
-│   ├── ui/                     # shadcn/ui components
-│   ├── book-filter.tsx         # Book filters
-│   ├── fusion-card.tsx         # Fusion mode card
-│   ├── progress-bar.tsx        # Progress visualization
-│   └── history-card.tsx        # History item card
+│   ├── ui/                     # shadcn/ui
+│   ├── csv-upload.tsx
+│   ├── book-filter.tsx
+│   ├── fusion-card.tsx
+│   ├── progress-bar.tsx
+│   └── history-card.tsx
 ├── lib/
-│   ├── api.ts                  # API client functions
-│   └── supabase.ts             # Supabase client
+│   ├── api.ts                  # axios client
+│   ├── supabase.ts             # Supabase client
+│   ├── query-client.ts         # React Query
+│   └── store.ts                # Zustand
 └── hooks/
-    └── useRunProgress.ts       # Progress polling hook
+    ├── useRunProgress.ts
+    └── useUser.ts              # Auth hook
 ```
 
 ### Naming Conventions
@@ -161,7 +159,7 @@ export const api = {
   // Runs
   createRun: async (params: {
     book_ids: string[]
-    mode: 'reduce' | 'simple_merge'
+    mode: 'synthesis' | 'simple_merge'
     format: 'content' | 'service'
     remind_enabled: boolean
   }) => {
@@ -249,7 +247,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
 interface FusionCardProps {
-  mode: 'reduce' | 'simple_merge'
+  mode: 'synthesis' | 'simple_merge'
   title: string
   description: string
   samples: string[]
@@ -292,7 +290,7 @@ export function FusionCard({
           className="w-full"
           variant={isRecommended ? 'default' : 'outline'}
         >
-          Select {mode === 'reduce' ? 'Reduce' : 'Simple Merge'} Mode
+          Select {mode === 'synthesis' ? 'Synthesis' : 'Simple Merge'} Mode
         </Button>
       </CardContent>
     </Card>
@@ -392,5 +390,7 @@ export function ProgressBar({ nodes, currentNode }: ProgressBarProps) {
 - React Query: https://tanstack.com/query/latest
 - Zustand: https://zustand-demo.pmnd.rs/
 - shadcn/ui: https://ui.shadcn.com/
-- Page specs: `TODOs.md` (Phase 3.2)
-- Project PRD: `docs/PRD_ideator-books.md` (Section 4)
+- Supabase Auth: https://supabase.com/docs/guides/auth
+- react-markdown: https://github.com/remarkjs/react-markdown
+- Page specs: `TODOs.md` (Phase 3.1-3.2)
+- Backend API: `.cursor/rules/backend-api.mdc`

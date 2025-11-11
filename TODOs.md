@@ -226,7 +226,7 @@
 | 2.4.2 | 인증 Dependency | ✅ DONE | require_auth, get_optional_user (비동기 지원) |
 | 2.4.3 | 엔드포인트 보호 | ✅ DONE | books, runs, history에 user_id = Depends(require_auth) 추가 |
 | 2.4.4 | ✅ 테스트: 인증 플로우 | ✅ DONE | E2E 테스트 통과 (인증 헤더 포함) |
-| 2.4.5 | 🔄 Git Commit: "Phase 2 완료" | 🚧 IN PROGRESS | API 레이어 전체 (DB + API + 백그라운드 + 인증) |
+| 2.4.5 | 🔄 Git Commit: "Phase 2 완료" | ✅ DONE | commit d27534a (6 files, 154 insertions) |
 
 ---
 
@@ -236,25 +236,72 @@
 
 | ID | 작업 내용 | Status | 비고 |
 |----|----------|--------|------|
-| 3.1.1 | Next.js 14+ 프로젝트 생성 | ⏳ TODO | App Router |
-| 3.1.2 | TailwindCSS + shadcn/ui | ⏳ TODO | UI 라이브러리 |
-| 3.1.3 | Supabase 클라이언트 | ⏳ TODO | @supabase/supabase-js |
-| 3.1.4 | React Query + Zustand | ⏳ TODO | 상태 관리 |
-| 3.1.5 | ✅ 테스트: 프론트엔드 실행 확인 | ⏳ TODO | npm run dev, http://localhost:3000 |
-| 3.1.6 | 🔄 Git Commit: "프론트엔드 초기화" | ⏳ TODO | Next.js + 라이브러리 설정 |
+| 3.1.1 | Next.js 14+ 프로젝트 생성 | ✅ DONE | App Router, TypeScript, TailwindCSS |
+| 3.1.2 | 필수 패키지 설치 | ✅ DONE | Supabase, React Query, Zustand, axios |
+| 3.1.3 | shadcn/ui 초기화 및 컴포넌트 | ✅ DONE | button, card, input, label, select, badge, progress, sonner |
+| 3.1.4 | 환경 변수 설정 (.env.local) | ✅ DONE | API_URL, SUPABASE_URL, SUPABASE_ANON_KEY |
+| 3.1.5 | 핵심 유틸리티 파일 | ✅ DONE | lib/supabase.ts, lib/api.ts, lib/query-client.ts |
+| 3.1.6 | 레이아웃 및 Provider 설정 | ✅ DONE | app/layout.tsx, app/providers.tsx (React Query Provider, Sonner) |
+| 3.1.7 | Supabase Auth UI 통합 | ✅ DONE | app/auth/page.tsx, middleware.ts (@supabase/ssr) |
+| 3.1.8 | 사용자 정보 훅 | ✅ DONE | hooks/useUser.ts (세션 관리, 로그아웃) |
+| 3.1.9 | ✅ 테스트: 프론트엔드 실행 확인 | ✅ DONE | npm run dev (http://localhost:3000), 인증 리디렉트 확인 |
+| 3.1.10 | 🔄 Git Commit: "프론트엔드 초기화" | ⏳ TODO | Next.js + 라이브러리 + 인증 설정 |
 
 ### 3.2 화면 구현
 
-| ID | 화면 | Status | 비고 |
-|----|------|--------|------|
-| 3.2.1 | /library | ⏳ TODO | CSV 업로드, 최근 결과물 6개 |
-| 3.2.2 | /books/select | ⏳ TODO | 3열 레이아웃 (필터/목록/옵션) |
-| 3.2.3 | /fusion | ⏳ TODO | 추천 vs 대안 카드 비교 |
-| 3.2.4 | /runs/[id] | ⏳ TODO | 진행 바 + 노드별 상태 |
-| 3.2.5 | /preview/[id] | ⏳ TODO | 1p 미리보기 + 앵커 토글 |
-| 3.2.6 | /history | ⏳ TODO | 히스토리 카드 + 복습 카드 |
-| 3.2.7 | ✅ 테스트: 각 화면 UI/UX 확인 | ⏳ TODO | 반응형, 데이터 로딩 |
-| 3.2.8 | 🔄 Git Commit: "Phase 3 완료" | ⏳ TODO | 프론트엔드 6개 화면 |
+| ID | 화면 | Status | 주요 작업 | 비고 |
+|----|------|--------|----------|------|
+| 3.2.1 | /library | ✅ DONE | CSV 업로드(drag&drop), 최근 6개 결과물 그리드, 업로드된 라이브러리 목록(Collapsible), 라이브러리 삭제 | components/csv-upload.tsx, history-card.tsx, Collapsible |
+| 3.2.2 | /books/select | ✅ DONE | 3열 레이아웃, 필터(도메인/연도/주제), 도서 선택, Zustand 상태 관리, 중복 도서 제거 | components/book-filter.tsx, book-list.tsx, book-selection-panel.tsx |
+| 3.2.3 | /fusion | ✅ DONE | POST /api/fusion/preview, 추천/대안 카드 비교, POST /api/runs 실행, 페이지 이동 시 상태 유지 | components/fusion-card.tsx |
+| 3.2.4 | /runs/[id] | ✅ DONE | 2초 폴링, 9개 노드 실시간 상태 표시, 완료 시 자동 이동, 노드 이름 동기화 | components/progress-bar.tsx, hooks/useRunProgress.ts |
+| 3.2.5 | /preview/[id] | ✅ DONE | Markdown 렌더링(react-markdown), 앵커 토글, MD 다운로드, 리마인드 설정 | react-markdown, remark-gfm, Artifacts API JSON 반환 |
+| 3.2.6 | /history | ✅ DONE | 히스토리 목록(페이지네이션), 복습 카드 섹션, 항목 클릭 시 미리보기 | history-card 재사용 |
+| 3.2.7 | ✅ 테스트: 각 화면 API 연동 확인 | ✅ DONE | 백엔드 API 호출 및 응답 검증, 주요 플로우 테스트 완료 |
+| 3.2.8 | ✅ 테스트: E2E 사용자 플로우 | ✅ DONE | Library → Books → Fusion → Runs → Preview 기본 플로우 확인 |
+| 3.2.9 | 🔄 Git Commit: "Phase 3 완료" | ⏳ TODO | 프론트엔드 6개 화면 + 컴포넌트 + API 연동 |
+
+**Phase 3 주요 수정 및 개선:**
+- ✅ API Contract Sync: `.cursor/rules/api-contract-sync.mdc` 생성 (백엔드-프론트엔드 계약 동기화 규칙)
+- ✅ 노드 이름 동기화: 백엔드 `anchor_mapper` ↔ 프론트엔드 `ProgressBar` 일치
+- ✅ Artifacts API 개선: JSON 반환 + `/download` 엔드포인트 분리
+- ✅ OPENAI_API_KEY 설정: `main.py`에서 `os.environ` 명시적 설정
+- ✅ Run State 초기화: `create_initial_state` 헬퍼 함수 사용, `book_ids` 리스트 전달
+- ✅ 도메인 필터 동기화: 프론트엔드 `DOMAINS` 배열에 슬래시 포함 (`경제/경영`)
+- ✅ 실시간 진행바: 2초 폴링으로 노드별 상태 업데이트 확인
+- ✅ Preview 페이지: Markdown 렌더링 정상 작동, content 표시
+
+### 3.3 품질 개선 (KB Service 초기화)
+
+**문제 분석:**
+- ⚠️ KB Service 초기화: vectorizer 미초기화 경고 (`[WARN] No candidates or vectorizer not initialized`)
+- ⚠️ anchored_by 품질: 24.4% (목표 100%), 백엔드 Phase 1.5 수준(70.5%)과 격차
+- ⚠️ 가짜 앵커: 4개 발견 (`anchor_긴장축1`, `anchor_통합지식` 등)
+- ⚠️ available_anchors 미전달: Producer에서 가짜 앵커 방지 기능 미작동
+
+**근본 원인:**
+- `backend/services/kb_service.py` Line 301에서 global instance 생성하지만 `load_all_domains()` 미호출
+- `backend/main.py` 앱 시작 시 KB 초기화 로직 없음
+- `kb_service.all_items`가 비어있어 `available_anchors`가 빈 리스트로 전달
+
+| ID | 작업 내용 | Status | 비고 |
+|----|----------|--------|------|
+| 3.3.1 | KB Service 자동 로드 (kb_service.py) | ✅ DONE | 모듈 import 시 자동 로드, 경로 수정 |
+| 3.3.2 | 네비게이션 바 추가 (navbar.tsx) | ✅ DONE | 전체 페이지에 홈/라이브러리/히스토리 네비 |
+| 3.3.3 | 히스토리 카드 개선 | ✅ DONE | 출발 지식(제목+저자), 1p 제목, CTA 표시 |
+| 3.3.4 | 히스토리 카드 삭제 기능 | ✅ DONE | DELETE /api/runs/{id}, 권한 검증 |
+| 3.3.5 | 출발 지식 가독성 개선 | ✅ DONE | 각 항목 개행, **굵게** 표시 |
+| 3.3.6 | 형식 분기 간소화 | ✅ DONE | Synthesis/Simple Merge 모두 간단히 |
+| 3.3.7 | 통합 기록 간소화 (simple_merge) | ✅ DONE | 도메인 리뷰 참조로 간소화 |
+| 3.3.8 | 도메인 통일 (constants) | ✅ DONE | backend/core/constants.py, frontend/lib/constants.ts |
+| 3.3.9 | 히스토리 날짜별/분야별 Tabs | ✅ DONE | Tabs + Collapsible, domain 필드 추가 |
+| 3.3.10 | 🔄 Git Commit: "Phase 3.3 완료" | 🚧 IN PROGRESS | KB 초기화 + UI 개선 + 도메인 통일 |
+
+**예상 성과:**
+- ✅ anchored_by: 24.4% → **70%+** (백엔드 수준)
+- ✅ 가짜 앵커: 4개 → **0개**
+- ✅ KB 검색 경고 사라짐
+- ✅ `[OK] Available anchors: 144 items` 로그 출력
 
 ---
 

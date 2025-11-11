@@ -15,9 +15,29 @@ logger = logging.getLogger(__name__)
 class KBService:
     """KB 파일 파싱 및 검색 서비스"""
     
-    DOMAINS = ["경제경영", "과학기술", "역사사회", "인문자기계발"]
+    # KB 파일명용 도메인 (슬래시 없음)
+    KB_DOMAINS = ["경제경영", "과학기술", "역사사회", "인문자기계발"]
     
-    def __init__(self, kb_dir: str = "docs"):
+    # DB/CSV 표준 도메인 (슬래시 있음)
+    DB_DOMAINS = ["경제/경영", "과학/기술", "역사/사회", "인문/자기계발"]
+    
+    # 매핑
+    DOMAIN_MAPPING = {
+        "경제/경영": "경제경영",
+        "과학/기술": "과학기술",
+        "역사/사회": "역사사회",
+        "인문/자기계발": "인문자기계발"
+    }
+    
+    # 역매핑
+    KB_TO_DB = {v: k for k, v in DOMAIN_MAPPING.items()}
+    
+    def __init__(self, kb_dir: str = None):
+        # 프로젝트 루트의 docs/ 디렉토리 찾기
+        if kb_dir is None:
+            # backend/services/kb_service.py → backend/ → project_root/
+            project_root = Path(__file__).parent.parent.parent
+            kb_dir = project_root / "docs"
         self.kb_dir = Path(kb_dir)
         self.kb_items: Dict[str, List[KBItem]] = {}
         self.all_items: List[KBItem] = []
@@ -27,7 +47,7 @@ class KBService:
     def load_all_domains(self) -> Dict[str, int]:
         """모든 도메인 KB 파일 로드"""
         result = {}
-        for domain in self.DOMAINS:
+        for domain in self.KB_DOMAINS:
             count = self.load_domain(domain)
             result[domain] = count
             logger.info(f"[OK] {domain}: {count} items loaded")
@@ -299,4 +319,12 @@ class KBService:
 
 # Global KB service instance
 kb_service = KBService()
+
+# Auto-load KB on module import
+logger.info("[KB-SERVICE] Auto-loading KB on module import...")
+try:
+    _load_stats = kb_service.load_all_domains()
+    logger.info(f"[KB-SERVICE] KB auto-loaded successfully: {_load_stats}")
+except Exception as e:
+    logger.error(f"[KB-SERVICE] KB auto-load failed: {e}")
 

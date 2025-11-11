@@ -47,6 +47,18 @@ async def get_history(
         for run in runs_result.data:
             run_id = run["id"]
             
+            # Books 조회 (domain 정보 획득)
+            book_ids = run["params_json"].get("book_ids", [])
+            domain = None
+            if book_ids:
+                books_result = supabase.table("books") \
+                    .select("meta_json") \
+                    .eq("id", book_ids[0]) \
+                    .execute()
+                
+                if books_result.data:
+                    domain = books_result.data[0]["meta_json"].get("domain")
+            
             # Artifacts 조회
             artifacts_result = supabase.table("artifacts") \
                 .select("*") \
@@ -67,7 +79,7 @@ async def get_history(
             ] if artifacts_result.data else []
             
             # Reminders 조회 (첫 번째 artifact만)
-            reminder = None
+            reminders = []
             if artifacts:
                 first_artifact_id = artifacts[0].id
                 reminder_result = supabase.table("reminders") \
@@ -78,7 +90,7 @@ async def get_history(
                 
                 if reminder_result.data:
                     rem = reminder_result.data[0]
-                    reminder = ReminderResponse(
+                    reminder_obj = ReminderResponse(
                         id=rem["id"],
                         user_id=rem["user_id"],
                         artifact_id=rem["artifact_id"],
@@ -86,16 +98,18 @@ async def get_history(
                         active=rem["active"],
                         created_at=rem["created_at"]
                     )
+                    reminders = [reminder_obj]
             
             # History 항목 생성
             history_item = HistoryResponse(
-                run_id=run_id,
+                id=run_id,  # run_id → id
                 status=run["status"],
+                domain=domain,  # 도서 도메인 추가
                 created_at=run["created_at"],
                 completed_at=run.get("completed_at"),
                 artifacts=artifacts,
-                reminder=reminder,
-                params=run["params_json"]
+                reminders=reminders,  # 배열로 변경
+                params_json=run["params_json"]  # params → params_json
             )
             
             history_list.append(history_item)

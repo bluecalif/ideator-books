@@ -97,7 +97,7 @@ def save_artifact_to_storage(
         # 임시: content를 직접 저장하지 않고 placeholder URL 반환
         placeholder_url = f"https://storage.example.com/{filename}"
         
-        # Artifact 레코드 생성
+        # Artifact 레코드 생성 (content를 metadata_json에 저장)
         artifact_result = supabase.table("artifacts").insert({
             "run_id": run_id,
             "kind": "onepager",
@@ -106,7 +106,8 @@ def save_artifact_to_storage(
             "metadata_json": {
                 "filename": filename,
                 "content_length": len(content),
-                "created_at": datetime.now().isoformat()
+                "created_at": datetime.now().isoformat(),
+                "content": content  # 실제 content 저장
             }
         }).execute()
         
@@ -164,16 +165,19 @@ def execute_pipeline(
         
         # LangGraph 워크플로우는 이미 컴파일되어 있음 (graph.py의 전역 변수)
         
-        # 입력 데이터 준비
-        inputs = {
-            "book_id": book["id"],
-            "book_summary": book_meta.get("summary", ""),
-            "book_title": book_meta.get("title", ""),
-            "book_author": book_meta.get("author", ""),
-            "book_topic": book_meta.get("topic", ""),
-            "mode": mode,
-            "format": format
-        }
+        # 입력 데이터 준비 (create_initial_state 헬퍼 사용)
+        from backend.langgraph_pipeline.state import create_initial_state
+        
+        inputs = create_initial_state(
+            book_ids=[book["id"]],  # 리스트로 전달 (1권만)
+            mode=mode,
+            format=format,
+            remind_enabled=False,  # run params에서 가져올 수도 있음
+            book_summary=book_meta.get("summary", ""),
+            book_title=book_meta.get("title", ""),
+            book_author=book_meta.get("author", ""),
+            book_topic=book_meta.get("topic", "")
+        )
         
         # Config 설정 (thread_id로 상태 추적)
         config = {

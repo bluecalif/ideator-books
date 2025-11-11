@@ -63,20 +63,38 @@ async def get_books(
         # 실행
         result = query.execute()
         
+        logger.info(f"[BOOKS] Query result: {len(result.data) if result.data else 0} books from DB")
+        
         if not result.data:
             return []
         
-        # Response 변환
+        # Response 변환 및 중복 제거 (title + author 기준)
         books = []
-        for book in result.data:
-            books.append(BookResponse(
-                id=book["id"],
-                library_id=book["library_id"],
-                meta_json=BookMetadata(**book["meta_json"]),
-                created_at=book["created_at"]
-            ))
+        seen_books = set()  # (title, author) 튜플로 중복 체크
         
-        logger.info(f"[BOOKS] Retrieved {len(books)} books with filters: domain={domain}, topic={topic}, year_min={year_min}, year_max={year_max}")
+        for book in result.data:
+            try:
+                title = book["meta_json"].get("title", "")
+                author = book["meta_json"].get("author", "")
+                book_key = (title, author)
+                
+                # 중복 체크
+                if book_key in seen_books:
+                    continue
+                
+                seen_books.add(book_key)
+                
+                books.append(BookResponse(
+                    id=book["id"],
+                    library_id=book["library_id"],
+                    meta_json=BookMetadata(**book["meta_json"]),
+                    created_at=book["created_at"]
+                ))
+            except Exception as e:
+                logger.error(f"[ERROR] Failed to convert book {book.get('id')}: {e}")
+                continue
+        
+        logger.info(f"[BOOKS] Retrieved {len(books)} unique books (from {len(result.data)} total) with filters: domain={domain}, topic={topic}, year_min={year_min}, year_max={year_max}")
         
         return books
         
