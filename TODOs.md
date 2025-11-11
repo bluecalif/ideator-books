@@ -327,7 +327,7 @@
 | 4.1.1 | README.md 작성 | ✅ DONE | 프로젝트 개요, 아키텍처, 설치/실행 가이드 |
 | 4.1.2 | .env.example 정리 | ✅ DONE | backend/.env.example, frontend/.env.local.example |
 | 4.1.3 | 품질 검증 문서 | ✅ DONE | docs/QUALITY_METRICS.md (Phase 1.5 vs 3.3) |
-| 4.1.4 | 🔄 Git Commit: "Phase 4 완료 - MVP 완성" | 🚧 IN PROGRESS | 최종 릴리스 |
+| 4.1.4 | 🔄 Git Commit: "Phase 4 완료 - MVP 완성" | ✅ DONE | commit dd84373 (5 files, 469 insertions) |
 
 ### 4.2 선택 사항 (MVP 이후)
 - PDF 발행 기능 (현재 placeholder)
